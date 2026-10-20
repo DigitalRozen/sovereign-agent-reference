@@ -7,7 +7,7 @@ Everything runs on one machine in a single-node k3s cluster inside Docker (k3d).
 | | Minimum | Comfortable |
 |---|---|---|
 | OS | Linux or WSL2 (Ubuntu) | same |
-| Memory available to Docker | 8 GB | 12 GB+ |
+| Memory available to Docker | 7 GB | 12 GB+ |
 | CPUs available to Docker | 2 | 4+ |
 | Free disk for Docker images | 15 GB | 25 GB |
 
@@ -24,7 +24,7 @@ sudo apt-get install -y make openssl curl
 
 **WSL2:** use Docker Desktop with WSL integration enabled, or Docker Engine installed inside the distro. Docker Desktop on WSL2 gets its memory from `%UserProfile%\.wslconfig` (`[wsl2]` → `memory=12GB`); restart WSL (`wsl --shutdown`) after changing it. Clone the repo inside the Linux filesystem (`~/...`), not under `/mnt/c`.
 
-**macOS:** not tested. k3d on Docker Desktop should work; give Docker Desktop at least 8 GB in *Settings → Resources*.
+**macOS:** not tested. k3d on Docker Desktop should work; give Docker Desktop at least 8 GB (7 GB is the minimum) in *Settings → Resources*.
 
 ## 2. Check the machine
 
@@ -70,6 +70,7 @@ Locally built images (`sovereign-agent/*:dev`) stay in Docker; remove them with 
 | `rollout status deployment/litellm` times out | The LiteLLM image is large and runs database migrations on start. Check `kubectl -n platform logs deployment/litellm`; on a slow connection, re-run `make up`. |
 | Keycloak is not reachable on `http://localhost:8080/auth` | Traefik is still starting, or Keycloak ran out of memory. Check `kubectl -n platform get pods` and Docker's memory limit. |
 | Image pulls fail or hit rate limits | Check network or proxy access to Docker Hub, quay.io and ghcr.io, then re-run `make up`. |
+| A pod stays in `ErrImageNeverPull` | The images are built locally and imported, never pulled. When the disk is nearly full, k3s can garbage-collect images that no pod uses yet. Free disk space (`make doctor` checks it), then `make down && make up`. |
 | You want a clean slate | `make down && make up`. New passwords are generated; run `make creds` again. |
 
 For anything else, `kubectl get pods -A` and the logs of the failing pod are the starting point; the CI workflow's *Cluster state on failure* step lists the useful commands.
