@@ -33,8 +33,17 @@ COMMIT;
 SQL
 
 echo "== Agent runs and app sessions (in memory): restarting agent-api"
+mapfile -t old_pods < <(kubectl -n platform get pods -l app=agent-api -o name)
 kubectl -n platform rollout restart deployment/agent-api >/dev/null
 kubectl -n platform rollout status deployment/agent-api --timeout=120s >/dev/null
+# The ingress can still route to the old pod for a moment (a 504); wait until it is gone
+# and the public URL answers.
+kubectl -n platform wait --for=delete "${old_pods[@]}" --timeout=90s >/dev/null
+for _ in $(seq 30); do
+  curl -fs -o /dev/null "$BASE/agent/healthz" && break
+  sleep 1
+done
+curl -fsS -o /dev/null "$BASE/agent/healthz"
 
 echo "== Keycloak: ending every session in realm tarnwick"
 admin_password="$(kubectl -n platform get secret keycloak-credentials \
