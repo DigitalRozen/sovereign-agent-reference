@@ -6,7 +6,7 @@ set -uo pipefail
 CLUSTER=sovereign-agent
 PORT=8080
 MIN_K3D=5.8.0
-MIN_MEM_GB=8
+MIN_MEM_GB=7
 GOOD_MEM_GB=12
 MIN_DISK_GB=15
 ROOT="$(cd "$(dirname "$0")/.." && pwd)"
@@ -58,11 +58,11 @@ elif ! docker info >/dev/null 2>&1; then
   fail "the Docker daemon is not reachable (is it running? is your user in the docker group?)"
 else
   pass "daemon reachable (server $(docker info --format '{{.ServerVersion}}' 2>/dev/null))"
-  mem_bytes="$(docker info --format '{{.MemTotal}}' 2>/dev/null || echo 0)"
-  mem_gb=$((mem_bytes / 1024 / 1024 / 1024))
-  if ((mem_gb < MIN_MEM_GB)); then
+  mem_mib=$(($(docker info --format '{{.MemTotal}}' 2>/dev/null || echo 0) / 1024 / 1024))
+  mem_gb="$(awk -v m="$mem_mib" 'BEGIN { printf "%.1f", m / 1024 }')"
+  if ((mem_mib < MIN_MEM_GB * 1024)); then
     fail "Docker has ${mem_gb} GB memory (need >= ${MIN_MEM_GB} GB; raise it in Docker Desktop or .wslconfig)"
-  elif ((mem_gb < GOOD_MEM_GB)); then
+  elif ((mem_mib < GOOD_MEM_GB * 1024)); then
     warn "Docker has ${mem_gb} GB memory (works, but ${GOOD_MEM_GB}+ GB is comfortable)"
   else
     pass "Docker memory ${mem_gb} GB"
