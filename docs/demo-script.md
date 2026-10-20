@@ -37,23 +37,20 @@ Every spoken line has 12 words or fewer. A `/` separates lines; pause briefly at
 **Before the first take**
 
 ```bash
-make doctor     # every line PASS or WARN
-make down       # only if a cluster from earlier runs exists
-make up         # fresh cluster, about 5 minutes
-make creds      # copy the passwords for alice and morgan
+make doctor       # every line PASS or WARN
+make up           # about 5 minutes on a new cluster; safe to re-run on an existing one
+make reset-demo   # no drafts, no orders, no runs, nobody logged in, empty audit log
+make creds        # copy the passwords for alice and morgan
 ```
 
-Do not run `make smoke` or `make demo` before the take: they create runs, drafts and audit rows, and the draft is then no longer #1.
+`make reset-demo` makes the take start clean even if you ran `make smoke` or `make demo` before: the draft and the ERP order are both #1 and the audit log is empty. The old audit table is not deleted; it is renamed (`audit.events_until_<time>`) and stays append-only.
 
 Type `make demo` in the terminal and do not press Enter yet.
 
 **Between takes**
 
-The cluster must be fresh for every take, so that the draft and the ERP order are both #1 and the audit log starts empty.
-
-1. `make down && make up` (about 5 minutes).
-2. `make creds`. The passwords are new after every `make up`.
-3. In both browser profiles, delete the cookies for `localhost:8080`, then reload `http://localhost:8080/agent/`. Both should show *Log in*.
-4. In the terminal, press Ctrl+L and type `make demo` again, without Enter.
+1. `make reset-demo` (about 30 seconds). It also ends every Keycloak session, so both browser profiles show *Log in* after a reload. The passwords do not change.
+2. In both browser profiles, reload `http://localhost:8080/agent/`.
+3. In the terminal, press Ctrl+L and type `make demo` again, without Enter.
 
 If the first `make demo` after `make up` takes longer than about 10 seconds, cut the wait in editing; the narration for shot 2 starts when the output appears.
