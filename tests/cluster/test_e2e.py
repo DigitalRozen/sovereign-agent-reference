@@ -71,6 +71,16 @@ def browser_login(username: str, password: str) -> Browser:
     return browser
 
 
+def test_logout_ends_the_identity_provider_session(passwords):
+    browser = browser_login("alice", passwords["alice"])
+    home = browser.post("/agent/logout")
+    assert home.status_code == 200 and str(home.url).endswith("/agent/"), home.text[:300]
+    assert "Log in" in home.text and "alice ·" not in home.text
+    # With only the app cookie cleared, Keycloak would sign alice straight back in here.
+    again = browser.get("/agent/login")
+    assert 'id="kc-form-login"' in again.text, "Keycloak session survived the logout"
+
+
 @pytest.fixture(scope="module")
 def alice_run(user_token) -> dict:
     response = httpx.post(

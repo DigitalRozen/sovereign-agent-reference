@@ -21,6 +21,7 @@ class Settings:
     client_id: str = "agent-ui"
     client_secret: str = _env("AGENT_UI_CLIENT_SECRET")
     redirect_uri: str = _env("AGENT_REDIRECT_URI", "http://localhost:8080/agent/callback")
+    post_logout_redirect_uri: str = _env("AGENT_POST_LOGOUT_URI", "http://localhost:8080/agent/")
 
     gateway_url: str = _env("LLM_GATEWAY_URL", "http://litellm.platform.svc.cluster.local:4000")
     model: str = _env("AGENT_MODEL", "agent-default") or "agent-default"
