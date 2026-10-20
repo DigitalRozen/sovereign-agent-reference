@@ -54,9 +54,10 @@ Details, trust boundaries and a step-by-step request walk-through are in [docs/a
 
 ## Quickstart
 
-Requires Docker, [k3d](https://k3d.io) v5.8+, kubectl, openssl, curl and [uv](https://docs.astral.sh/uv/). Targets Linux and WSL2 (Ubuntu). A machine with 16 GB RAM is comfortable.
+Requires Docker, [k3d](https://k3d.io) v5.8+, kubectl, openssl, curl and [uv](https://docs.astral.sh/uv/). Targets Linux and WSL2 (Ubuntu). A machine with 16 GB RAM is comfortable. Step-by-step setup, sizing and troubleshooting: [RUN_LOCAL.md](RUN_LOCAL.md).
 
 ```bash
+make doctor            # check prerequisites (read-only)
 cp .env.example .env   # optional: set OPENROUTER_API_KEY to use a real model
 make sync              # dev dependencies
 make up                # build images, create the k3d cluster, deploy (first run: several minutes)
@@ -91,7 +92,7 @@ services/
   mcp_erp/         MCP tool server, policy, approval endpoint
   sandbox_runner/  Job builder and runner for model-written code
   scripted_llm/    deterministic OpenAI-compatible model + scenario
-scripts/           up / creds / demo
+scripts/           doctor / up / creds / demo
 tests/cluster/     tests against the running cluster
 docs/              architecture, ADRs, demo script, governance checklist
 ```
