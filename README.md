@@ -1,10 +1,15 @@
-# Sovereign Agent Reference Architecture
+# Sovereign Agent Reference
 
-**A governed enterprise agent on Kubernetes, where every control sits outside the model.**
+A governed AI agent on Kubernetes (k3s) that drafts purchase orders against an ERP, with every control enforced outside the model. In the demo the agent is prompt-injected into ordering 250,000 kg, the guardrails reject the draft, and a manager approves the real 13,000 kg order with their own login. This is a single-node reference build, not production software, built with AI-assisted coding (see [known limitations](#known-limitations)).
 
-An agent drafts purchase orders against an ERP. It acts with the user's identity and LLM budget, reads data through a policy-enforcing MCP server, runs its own code in a network-less sandbox, and can never place an order: a manager approves drafts with their own login. Every decision is audited. The demo includes a prompt injection that the model obeys, and the controls still hold.
+## What this shows
 
-> **Reference architecture and demo, not production software.** Built with AI-assisted coding. All company names and data are fictional and synthetic. Known limitations are listed [below](#known-limitations).
+| Area | Component | What it enforces |
+|---|---|---|
+| Sovereign agent on k3s | [`agent-api`](services/agent_api) and [`mcp-erp`](services/mcp_erp) on a single-node k3s cluster ([k3d config](deploy/k3d/cluster.yaml)) | The agent runs in-cluster with the user's token. Tools check roles and a deterministic draft policy. No tool can approve or submit an order. |
+| LLM gateway | [LiteLLM](deploy/base/litellm/config.yaml) | One virtual key per user: budget, rate limit, model allow-list, spend. The default model is scripted, so no request leaves the machine. |
+| IAM | [Keycloak](deploy/base/keycloak/realm-tarnwick.json) OIDC with roles | Login with code + PKCE. Every service verifies the token and the role (buyer, procurement_manager, viewer). Nobody approves their own draft. |
+| Code sandbox | [Network-less pod](deploy/base/sandbox/network-policy.yaml), one Kubernetes Job per run | Deny-all egress, no service account token, read-only root, restricted Pod Security, 15-second deadline. |
 
 ![CI](https://github.com/DigitalRozen/sovereign-agent-reference/actions/workflows/ci.yml/badge.svg)
 
