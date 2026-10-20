@@ -59,7 +59,7 @@ Details, trust boundaries and a step-by-step request walk-through are in [docs/a
 
 ## Quickstart
 
-Requires Docker, [k3d](https://k3d.io) v5.8+, kubectl, openssl, curl and [uv](https://docs.astral.sh/uv/). Targets Linux and WSL2 (Ubuntu); on WSL2 with Docker Desktop the sandbox's network isolation was not enforced in one test, see [RUN_LOCAL.md](RUN_LOCAL.md). A machine with 16 GB RAM is comfortable. Step-by-step setup, sizing and troubleshooting: [RUN_LOCAL.md](RUN_LOCAL.md).
+Requires Docker, [k3d](https://k3d.io) v5.8+, kubectl, openssl, curl and [uv](https://docs.astral.sh/uv/). Targets Linux and WSL2 (Ubuntu). A machine with 16 GB RAM is comfortable. Step-by-step setup, sizing and troubleshooting: [RUN_LOCAL.md](RUN_LOCAL.md).
 
 ```bash
 make doctor            # check prerequisites (read-only)
@@ -108,7 +108,7 @@ This is a single-node reference, built to make the security boundaries visible a
 
 - **No HA, no TLS.** One replica per service. Keycloak runs in dev mode (H2, HTTP). The agent keeps sessions and run transcripts in memory.
 - **Token forwarding, not exchange.** One user token is valid at both the tool server and the sandbox, and it carries no agent identity ([ADR-0005](docs/adr/0005-user-token-forwarding.md)).
-- **Sandbox network isolation depends on the host.** It relies on k3s enforcing NetworkPolicy. Native Linux does (CI); one WSL2 + Docker Desktop machine did not, cause not yet identified. `make up` and `make doctor` test it and warn.
+- **Sandbox network isolation depends on k3s enforcing NetworkPolicy, and it applies late on some hosts.** On WSL2 with Docker Desktop a new pod had network for about two seconds before its policy landed. The sandbox therefore runs model code only after the pod sees its own egress blocked, and refuses to run it otherwise. `make up` and `make doctor` also test enforcement.
 - **No kernel isolation for the sandbox.** Containers share the node's kernel; gVisor or Kata is the next step ([ADR-0007](docs/adr/0007-sandbox-kubernetes-jobs.md)).
 - **The AI data layer is views in the same database,** not a replica or CDC copy ([ADR-0003](docs/adr/0003-separate-ai-data-layer.md)).
 - **Approval runs in the tool server's process,** and there is no step-up MFA ([ADR-0004](docs/adr/0004-human-approval-server-checked.md)).

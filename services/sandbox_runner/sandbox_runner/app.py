@@ -13,7 +13,14 @@ from kubernetes import client, config
 from psycopg.types.json import Jsonb
 from pydantic import BaseModel, Field
 
-from .job import DEADLINE_SECONDS, NAMESPACE, CodeRejected, build_job, job_name
+from .job import (
+    DEADLINE_SECONDS,
+    NAMESPACE,
+    NOT_ISOLATED_EXIT,
+    CodeRejected,
+    build_job,
+    job_name,
+)
 
 ISSUER = os.environ.get("OIDC_ISSUER", "http://localhost:8080/auth/realms/tarnwick")
 JWKS_URL = os.environ.get(
@@ -94,6 +101,8 @@ def _outcome(job: client.V1Job, pod: client.V1Pod | None) -> tuple[str, str] | N
             if condition.reason == "DeadlineExceeded":
                 return "timeout", f"killed after {DEADLINE_SECONDS}s"
             terminated = _terminated(pod)
+            if terminated is not None and terminated.exit_code == NOT_ISOLATED_EXIT:
+                return "failed", "sandbox network was not isolated; code not run"
             if terminated is not None:
                 return "failed", f"{terminated.reason} (exit {terminated.exit_code})"
             return "failed", condition.reason or "failed"
