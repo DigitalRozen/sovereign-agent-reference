@@ -1,9 +1,12 @@
-.PHONY: help sync lint fmt test up down smoke creds demo
+.PHONY: help doctor sync lint fmt test up down smoke creds demo
 
 CLUSTER := sovereign-agent
 
 help: ## List targets
 	@grep -E '^[a-z-]+:.*## ' $(MAKEFILE_LIST) | awk -F':.*## ' '{printf "  %-10s %s\n", $$1, $$2}'
+
+doctor: ## Check this machine can run the cluster (read-only)
+	./scripts/doctor.sh
 
 sync: ## Install dev dependencies
 	uv sync

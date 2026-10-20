@@ -1,0 +1,147 @@
+#!/usr/bin/env bash
+# Check that this machine can run `make up`. Read-only: it changes nothing.
+# Exit code 1 if any check FAILs; WARNs are printed but do not fail.
+set -uo pipefail
+
+CLUSTER=sovereign-agent
+PORT=8080
+MIN_K3D=5.8.0
+MIN_MEM_GB=8
+GOOD_MEM_GB=12
+MIN_DISK_GB=15
+ROOT="$(cd "$(dirname "$0")/.." && pwd)"
+
+fails=0
+warns=0
+pass() { printf '  PASS  %s\n' "$1"; }
+warn() { printf '  WARN  %s\n' "$1"; warns=$((warns + 1)); }
+fail() { printf '  FAIL  %s\n' "$1"; fails=$((fails + 1)); }
+
+# version_ge A B: true if version A >= version B (dotted numbers).
+version_ge() { [[ "$(printf '%s\n%s\n' "$2" "$1" | sort -V | head -n1)" == "$2" ]]; }
+
+echo "Platform"
+os="$(uname -s)"
+if [[ "$os" == "Linux" ]] && grep -qi microsoft /proc/version 2>/dev/null; then
+  pass "WSL2 ($(uname -r))"
+elif [[ "$os" == "Linux" ]]; then
+  pass "Linux ($(uname -r))"
+elif [[ "$os" == "Darwin" ]]; then
+  warn "macOS: not tested; k3d on Docker Desktop should work, see RUN_LOCAL.md"
+else
+  fail "unsupported OS: $os (use Linux or WSL2)"
+fi
+
+echo "Tools"
+for bin in docker k3d kubectl openssl curl uv make; do
+  if command -v "$bin" >/dev/null 2>&1; then
+    pass "$bin"
+  else
+    fail "$bin not found on PATH"
+  fi
+done
+if command -v k3d >/dev/null 2>&1; then
+  k3d_ver="$(k3d version 2>/dev/null | sed -n 's/^k3d version v\{0,1\}\([0-9.]*\).*/\1/p' | head -n1)"
+  if [[ -z "$k3d_ver" ]]; then
+    warn "could not read the k3d version (need >= $MIN_K3D)"
+  elif version_ge "$k3d_ver" "$MIN_K3D"; then
+    pass "k3d $k3d_ver >= $MIN_K3D"
+  else
+    fail "k3d $k3d_ver is too old (need >= $MIN_K3D)"
+  fi
+fi
+
+echo "Docker"
+if ! command -v docker >/dev/null 2>&1; then
+  fail "skipped: docker is not installed"
+elif ! docker info >/dev/null 2>&1; then
+  fail "the Docker daemon is not reachable (is it running? is your user in the docker group?)"
+else
+  pass "daemon reachable (server $(docker info --format '{{.ServerVersion}}' 2>/dev/null))"
+  mem_bytes="$(docker info --format '{{.MemTotal}}' 2>/dev/null || echo 0)"
+  mem_gb=$((mem_bytes / 1024 / 1024 / 1024))
+  if ((mem_gb < MIN_MEM_GB)); then
+    fail "Docker has ${mem_gb} GB memory (need >= ${MIN_MEM_GB} GB; raise it in Docker Desktop or .wslconfig)"
+  elif ((mem_gb < GOOD_MEM_GB)); then
+    warn "Docker has ${mem_gb} GB memory (works, but ${GOOD_MEM_GB}+ GB is comfortable)"
+  else
+    pass "Docker memory ${mem_gb} GB"
+  fi
+  cpus="$(docker info --format '{{.NCPU}}' 2>/dev/null || echo 0)"
+  if ((cpus < 2)); then
+    fail "Docker has ${cpus} CPU(s) (need >= 2)"
+  elif ((cpus < 4)); then
+    warn "Docker has ${cpus} CPUs (first deploy will be slow; 4+ recommended)"
+  else
+    pass "Docker CPUs ${cpus}"
+  fi
+  docker_root="$(docker info --format '{{.DockerRootDir}}' 2>/dev/null)"
+  # On Docker Desktop the root dir lives inside its VM and is not visible here.
+  if [[ -n "$docker_root" && -d "$docker_root" ]]; then
+    disk_gb="$(df -Pk "$docker_root" 2>/dev/null | awk 'NR==2 {print int($4 / 1024 / 1024)}')"
+    if [[ -z "$disk_gb" ]]; then
+      warn "could not read free disk for $docker_root"
+    elif ((disk_gb < MIN_DISK_GB)); then
+      fail "${disk_gb} GB free for Docker at $docker_root (need >= ${MIN_DISK_GB} GB for images)"
+    else
+      pass "${disk_gb} GB free for Docker"
+    fi
+  else
+    warn "Docker data dir not visible from this shell; check free disk (>= ${MIN_DISK_GB} GB) yourself"
+  fi
+fi
+
+echo "Kernel limits"
+if [[ "$os" == "Linux" && -r /proc/sys/fs/inotify/max_user_instances ]]; then
+  inst="$(cat /proc/sys/fs/inotify/max_user_instances)"
+  if ((inst < 512)); then
+    warn "fs.inotify.max_user_instances=$inst; pods may crash with 'too many open files' (fix: sudo sysctl fs.inotify.max_user_instances=512)"
+  else
+    pass "fs.inotify.max_user_instances=$inst"
+  fi
+else
+  pass "not applicable on $os"
+fi
+
+echo "Cluster and port $PORT"
+cluster_exists=false
+if command -v k3d >/dev/null 2>&1 && k3d cluster list "$CLUSTER" >/dev/null 2>&1; then
+  cluster_exists=true
+  pass "cluster '$CLUSTER' exists; 'make up' will reuse it"
+else
+  pass "no cluster '$CLUSTER' yet; 'make up' will create it"
+fi
+port_in_use=false
+if command -v ss >/dev/null 2>&1; then
+  ss -ltnH "sport = :$PORT" 2>/dev/null | grep -q . && port_in_use=true
+elif command -v lsof >/dev/null 2>&1; then
+  lsof -nP -iTCP:"$PORT" -sTCP:LISTEN >/dev/null 2>&1 && port_in_use=true
+else
+  warn "neither ss nor lsof found; cannot check port $PORT"
+fi
+if $port_in_use && ! $cluster_exists; then
+  fail "port $PORT is already in use; free it or change it in deploy/k3d/cluster.yaml"
+elif $port_in_use; then
+  pass "port $PORT is in use by the existing cluster"
+else
+  pass "port $PORT is free"
+fi
+
+echo "Configuration"
+if [[ -f "$ROOT/.env" ]] && grep -Eq '^OPENROUTER_API_KEY=.+' "$ROOT/.env"; then
+  pass ".env sets OPENROUTER_API_KEY: the agent will use a real model (requests leave the machine)"
+else
+  pass "no provider key: the agent uses the built-in scripted model, nothing leaves the machine"
+fi
+if [[ -d "$ROOT/.venv" ]]; then
+  pass "Python dev environment present"
+else
+  warn "no .venv yet; run 'make sync' before 'make smoke' or 'make demo'"
+fi
+
+echo
+if ((fails > 0)); then
+  echo "doctor: $fails failed, $warns warning(s). Fix the FAIL lines before 'make up'."
+  exit 1
+fi
+echo "doctor: ready for 'make up' ($warns warning(s))."
