@@ -1,4 +1,4 @@
-.PHONY: help doctor sync lint fmt test up down smoke creds demo audit
+.PHONY: help doctor sync lint fmt test up down smoke creds demo audit reset-demo
 
 CLUSTER := sovereign-agent
 
@@ -39,3 +39,6 @@ demo: ## Run the procurement scenario from the terminal
 
 audit: ## Show the latest audit events and that the table rejects deletes
 	./scripts/audit.sh
+
+reset-demo: ## Clear drafts, orders, runs and sessions; start a new audit table (for a clean take)
+	./scripts/reset-demo.sh

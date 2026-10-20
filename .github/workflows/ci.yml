@@ -56,6 +56,11 @@ jobs:
       - run: make creds > /dev/null
       - run: time make demo
       - run: time make audit
+      - name: make reset-demo, then the demo starts again from draft 1
+        run: |
+          time make reset-demo
+          make demo | tee demo.txt
+          grep -q 'Drafted purchase order #1 for' demo.txt
       - name: Cluster state on failure
         if: failure()
         run: |

@@ -97,7 +97,7 @@ services/
   mcp_erp/         MCP tool server, policy, approval endpoint
   sandbox_runner/  Job builder and runner for model-written code
   scripted_llm/    deterministic OpenAI-compatible model + scenario
-scripts/           doctor / up / creds / demo / audit
+scripts/           doctor / up / creds / demo / audit / reset-demo
 tests/cluster/     tests against the running cluster
 docs/              architecture, ADRs, demo script, governance checklist
 ```
