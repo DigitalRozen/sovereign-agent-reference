@@ -57,6 +57,18 @@ def login_request(settings: Settings) -> LoginRequest:
     )
 
 
+def logout_url(settings: Settings, id_token: str) -> str:
+    """RP-initiated logout: ends the Keycloak session too, not only this app's cookie."""
+    query = urlencode(
+        {
+            "id_token_hint": id_token,
+            "post_logout_redirect_uri": settings.post_logout_redirect_uri,
+            "client_id": settings.client_id,
+        }
+    )
+    return f"{settings.public_auth_url}/protocol/openid-connect/logout?{query}"
+
+
 class TokenVerifier:
     def __init__(self, settings: Settings, resolve_key=None) -> None:
         self.issuer = settings.issuer
@@ -89,8 +101,11 @@ class TokenVerifier:
         )
 
 
-async def exchange_code(settings: Settings, code: str, verifier: str) -> str:
-    """Redeem the authorization code over the cluster network. Returns the access token."""
+async def exchange_code(settings: Settings, code: str, verifier: str) -> tuple[str, str]:
+    """Redeem the authorization code over the cluster network.
+
+    Returns the access token and the ID token (kept only as the hint for logout).
+    """
     async with httpx.AsyncClient(timeout=10) as http:
         response = await http.post(
             f"{settings.internal_auth_url}/protocol/openid-connect/token",
@@ -104,4 +119,5 @@ async def exchange_code(settings: Settings, code: str, verifier: str) -> str:
             },
         )
     response.raise_for_status()
-    return response.json()["access_token"]
+    tokens = response.json()
+    return tokens["access_token"], tokens["id_token"]

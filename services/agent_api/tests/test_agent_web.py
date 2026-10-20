@@ -5,7 +5,7 @@ from urllib.parse import parse_qs, urlparse
 import pytest
 from agent_api import web
 from agent_api.config import settings
-from agent_api.oidc import login_request, pkce_pair
+from agent_api.oidc import User, login_request, pkce_pair
 from fastapi.testclient import TestClient
 
 
@@ -62,3 +62,24 @@ def test_api_requires_a_valid_bearer_token(client):
     assert (
         client.post("/agent/api/ask", json={"question": "hi"}, headers=headers).status_code == 401
     )
+
+
+def test_logout_ends_the_keycloak_session_too(client):
+    web.sessions["sid-1"] = User("alice", frozenset({"buyer"}), "access", 2**31)
+    id_token = "id-token-1"  # noqa: S105 - a fake token for the test
+    web.id_tokens["sid-1"] = id_token
+    client.cookies.set(web.COOKIE, "sid-1")
+    response = client.post("/agent/logout")
+    assert response.status_code == 303
+    url = urlparse(response.headers["location"])
+    params = {k: v[0] for k, v in parse_qs(url.query).items()}
+    assert url.path.endswith("/realms/tarnwick/protocol/openid-connect/logout")
+    assert params["id_token_hint"] == id_token
+    assert params["post_logout_redirect_uri"] == settings.post_logout_redirect_uri
+    assert "sid-1" not in web.sessions and "sid-1" not in web.id_tokens
+
+
+def test_logout_without_a_session_just_returns_home(client):
+    response = client.post("/agent/logout")
+    assert response.status_code == 303
+    assert response.headers["location"] == "/agent/"

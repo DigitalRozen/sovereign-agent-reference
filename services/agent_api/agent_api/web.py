@@ -16,7 +16,7 @@ from pydantic import BaseModel
 
 from .agent import Run, run_agent
 from .config import settings
-from .oidc import TokenVerifier, User, exchange_code, login_request
+from .oidc import TokenVerifier, User, exchange_code, login_request, logout_url
 
 COOKIE = "agent_sid"
 
@@ -27,6 +27,7 @@ verifier = TokenVerifier(settings)
 
 # In-memory state: fine for a single-replica demo, documented as a limitation.
 sessions: dict[str, User] = {}
+id_tokens: dict[str, str] = {}  # session id -> ID token, used as id_token_hint on logout
 pending_logins: dict[str, str] = {}  # state -> PKCE verifier
 runs: dict[str, Run] = {}
 
@@ -86,12 +87,13 @@ async def callback(code: str = "", state: str = ""):
     verifier_for_state = pending_logins.pop(state, None)
     if not code or verifier_for_state is None:
         raise HTTPException(400, "unknown or expired login attempt")
-    token = await exchange_code(settings, code, verifier_for_state)
+    token, id_token = await exchange_code(settings, code, verifier_for_state)
     user = await anyio.to_thread.run_sync(verifier.user, token)
     if user is None:
         raise HTTPException(401, "token verification failed")
     sid = secrets.token_urlsafe(32)
     sessions[sid] = user
+    id_tokens[sid] = id_token
     response = RedirectResponse("/agent/", status_code=303)
     response.set_cookie(COOKIE, sid, httponly=True, samesite="lax", path="/agent")
     return response
@@ -99,8 +101,12 @@ async def callback(code: str = "", state: str = ""):
 
 @router.post("/logout")
 def logout(request: Request):
-    sessions.pop(request.cookies.get(COOKIE, ""), None)
-    response = RedirectResponse("/agent/", status_code=303)
+    sid = request.cookies.get(COOKIE, "")
+    sessions.pop(sid, None)
+    id_token = id_tokens.pop(sid, None)
+    # Without ending the Keycloak session, the next login would silently return the same user.
+    target = logout_url(settings, id_token) if id_token else "/agent/"
+    response = RedirectResponse(target, status_code=303)
     response.delete_cookie(COOKIE, path="/agent")
     return response
 
