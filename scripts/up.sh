@@ -30,15 +30,31 @@ if ! k3d cluster list "$CLUSTER" >/dev/null 2>&1; then
 fi
 kubectl config use-context "k3d-$CLUSTER" >/dev/null
 
+# k3d can log "failed to import images" and still exit 0, so check the node itself and retry.
+import_image() {
+  local tag="$1" attempt images
+  for attempt in 1 2 3; do
+    k3d image import --mode direct -c "$CLUSTER" "$tag" >/dev/null || true
+    # Captured first: grep -q could end the pipe early and trip pipefail.
+    images="$(docker exec "k3d-$CLUSTER-server-0" ctr -n k8s.io images ls -q || true)"
+    if grep -qF -- "/$tag" <<<"$images"; then
+      return 0
+    fi
+    echo "image $tag is not in the cluster after import attempt $attempt" >&2
+  done
+  echo "could not import $tag into the cluster" >&2
+  return 1
+}
+
 # Application images are built locally and imported; nothing is pushed to a registry.
 for entry in "${IMAGES[@]}"; do
   dir="${entry%%:*}"
   tag="${entry#*:}"
   docker build -q -t "$tag" "$ROOT/services/$dir" >/dev/null
-  k3d image import -c "$CLUSTER" "$tag" >/dev/null
+  import_image "$tag"
 done
 docker image inspect "$SANDBOX_IMAGE" >/dev/null 2>&1 || docker pull -q "$SANDBOX_IMAGE" >/dev/null
-k3d image import -c "$CLUSTER" "$SANDBOX_IMAGE" >/dev/null
+import_image "$SANDBOX_IMAGE"
 
 kubectl apply -f "$ROOT/deploy/base/namespaces.yaml"
 

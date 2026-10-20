@@ -43,8 +43,8 @@ jobs:
             "https://github.com/k3d-io/k3d/releases/download/${K3D_VERSION}/k3d-linux-amd64"
           sudo chmod +x /usr/local/bin/k3d
           k3d version
-      # Private-repo runners have about 12 GB free, and k3s can then garbage-collect
-      # imported images before their pods start. Remove unused toolchains first.
+      # Private-repo runners start with about 12 GB free, below what make doctor
+      # requires for the images. Remove unused toolchains first.
       - name: Free disk space
         run: |
           sudo rm -rf /usr/share/dotnet /usr/local/lib/android /opt/ghc /opt/hostedtoolcache/CodeQL
