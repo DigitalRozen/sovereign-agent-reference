@@ -43,8 +43,14 @@ jobs:
             "https://github.com/k3d-io/k3d/releases/download/${K3D_VERSION}/k3d-linux-amd64"
           sudo chmod +x /usr/local/bin/k3d
           k3d version
+      # Informational: shows what doctor reports on a real Docker host.
+      - run: make doctor || true
       - run: make up
       - run: make smoke
+      # The commands used in docs/demo-script.md, run once on the same cluster.
+      - run: make creds > /dev/null
+      - run: time make demo
+      - run: time make audit
       - name: Cluster state on failure
         if: failure()
         run: |
@@ -57,3 +63,4 @@ jobs:
           kubectl -n platform logs deployment/sandbox-runner --tail=100
           kubectl -n sandbox get jobs,pods
           kubectl -n platform logs deployment/agent-api --tail=100
+      - run: make down

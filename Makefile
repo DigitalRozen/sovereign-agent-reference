@@ -1,4 +1,4 @@
-.PHONY: help doctor sync lint fmt test up down smoke creds demo
+.PHONY: help doctor sync lint fmt test up down smoke creds demo audit
 
 CLUSTER := sovereign-agent
 
@@ -36,3 +36,6 @@ creds: ## Print demo user logins
 
 demo: ## Run the procurement scenario from the terminal
 	./scripts/demo.sh
+
+audit: ## Show the latest audit events and that the table rejects deletes
+	./scripts/audit.sh
