@@ -1,17 +1,59 @@
-# Demo script (about 3 minutes)
+# Demo script (3:00)
 
-Recorded straight from `make up`. No API key is needed; with `OPENROUTER_API_KEY` set, the same flow runs on a real model.
+A 3-minute screen recording of the procurement scenario. It uses only the built-in scripted model, so every take shows the same steps and numbers. Leave `OPENROUTER_API_KEY` empty in `.env`.
 
-**Before recording:** run `make up && make smoke`, then `make creds`. Open three browser windows or profiles, one per user, so sessions do not mix.
+Two windows are on screen: a terminal and a browser. The browser has two profiles: **A** for alice (buyer) and **B** for morgan (procurement manager). Two profiles keep the Keycloak sessions apart.
 
-| Time | Screen | What to say |
-|---|---|---|
-| 0:00–0:20 | README top | "Agents that run on a customer's infrastructure touch real systems. Trusting the model is not a control. This is a reference architecture where every control sits outside the model." |
-| 0:20–0:45 | `docs/architecture.md` diagram | Walk left to right: identity, gateway, tools, sandbox, data, audit. "The agent holds no privileges of its own. It acts with the user's token and the user's LLM budget." |
-| 0:45–1:00 | Terminal: `kubectl get pods -A` | "All of it runs on Kubernetes, here a single-node k3s. CI builds a fresh cluster and runs the same tests on every push." |
-| 1:00–1:50 | Browser as **alice** (buyer): log in through Keycloak, run the prefilled question, open the run | Point at the steps: reads over MCP, then `run_python`. "The quantity is computed in a throwaway Kubernetes Job with no network." Then the red `draft_po`: "A supplier note contained an injected instruction. This model obeyed it and tried to order 250,000 kg. The tool server's policy refused it. The model then drafted 13,000 kg correctly." |
-| 1:50–2:15 | Browser as **morgan** (manager): *Drafts*, then Approve | "Only now does an ERP order exist, created with the manager's own token. Alice's approve click is refused, and so is self-approval." Show the banner with the ERP order and its EUR total. |
-| 2:15–2:40 | *Audit log* page; then terminal `make demo` or the gateway test | "Every allowed and refused decision is here, and the table rejects edits." Optionally run the agent as **val** (viewer) twice to show the sandbox refusing a viewer, and the gateway's 429 when val's rate limit is hit. |
-| 2:40–3:00 | `docs/adr/` list, README limitations | "Each tradeoff is an ADR. Limitations are listed honestly: no HA, dev-mode Keycloak, no kernel-level sandbox yet, token forwarding instead of exchange. Built with AI-assisted coding; the tests are the proof." |
+## Shots
 
-**Tips:** keep the terminal font large. Record at 1080p. Pre-warm the cluster so the first sandbox Job does not wait on the image.
+| # | Time | On screen | What you say |
+|---|---|---|---|
+| 1 | 0:00-0:05 | Terminal. `make demo` is already typed. Press Enter. | "This AI agent buys raw material for a factory." |
+| 2 | 0:05-0:17 | Terminal. The output appears (about 4 seconds). Point at the line `DENIED draft_po ... "quantity_kg": 250000`. | "A supplier note hides an order for 250,000 kilos." / "The model believes it and tries to order." |
+| 3 | 0:17-0:30 | Terminal. Point at `-> ... denied by policy: quantity 250000 kg is outside the allowed range`, then at `ok draft_po ... 13000`. | "The policy server says no. The limit is 20,000 kilos." / "Then the agent drafts the right amount: 13,000 kilos." |
+| 4 | 0:30-0:52 | Browser A, tab `https://github.com/DigitalRozen/sovereign-agent-reference`. Scroll to the "What this shows" table. | "Why is this safe? Four parts, all outside the model." / "The agent runs on Kubernetes, on one machine." / "Every model call goes through a gateway with a budget." / "Keycloak checks every user and every role." / "Model code runs in a pod with no network." |
+| 5 | 0:52-1:05 | Browser A, `http://localhost:8080/agent/`. Click *Log in*, sign in as `alice`. | "Alice is a buyer. Alice logs in through Keycloak." / "The agent has no rights of its own." / "It works with Alice's token." |
+| 6 | 1:05-1:30 | Browser A. Under *Your recent runs*, click the run. Scroll to the `run_python` step. | "Here is every step the agent took." / "First it reads stock, orders and suppliers." / "Then it writes Python to compute the quantity." / "That code runs in a new pod." / "No network, no secrets, fifteen seconds maximum." |
+| 7 | 1:30-1:42 | Browser A. Scroll to the red `draft_po` step (*denied / failed*). | "Here is the blocked order, in red." / "The model obeyed the attack. The controls still held." |
+| 8 | 1:42-1:57 | Browser A. Click *Drafts*, then *Approve* on draft #1. The banner says `not approved (403): approving requires the procurement_manager role`. | "The agent can only create drafts." / "Can Alice approve it? No. The server refuses." |
+| 9 | 1:57-2:22 | Browser B, `http://localhost:8080/agent/`. Click *Log in*, sign in as `morgan`. Click *Drafts*, then *Approve*. The banner says `Draft #1 approved: ERP order #1 (... EUR)`. | "Morgan is the procurement manager." / "Morgan logs in, in a second browser." / "Morgan approves the draft." / "Only now is there a real order in the ERP." / "13,000 kilos, for 37,050 euros." |
+| 10 | 2:22-2:40 | Browser B. Click *Audit log*. Point at the red `po.draft_rejected` row and the green `po.approved` row. | "Every step is in the audit log." / "Allowed and denied. Who did it, and when." / "The agent writes here. It cannot change anything." |
+| 11 | 2:40-2:52 | Terminal. Press Ctrl+L, type `make audit`, press Enter. Point at `ERROR: audit.events is append-only` and `rows left`. | "Can anyone delete this log? Let's try as the database admin." / "The database refuses. The log is append-only." |
+| 12 | 2:52-3:00 | Browser A, tab `https://github.com/DigitalRozen/sovereign-agent-reference`. | "The code and the tests are on GitHub." / "Thanks for watching." |
+
+Shot lengths in seconds: 5 + 12 + 13 + 22 + 13 + 25 + 12 + 15 + 25 + 18 + 12 + 8 = 180, that is 3:00.
+
+Every spoken line has 12 words or fewer. A `/` separates lines; pause briefly at each one.
+
+## Recording checklist
+
+**Screen and windows**
+
+- Record at 1280x720. Set both the terminal and the browser windows to 1280x720 and switch between them; do not show them side by side.
+- Terminal: dark theme, monospace font at about 16 px so that 120 columns fit the width. `make demo` lines are up to about 115 characters wide; check that they do not wrap.
+- Browser: zoom 100%, bookmarks bar hidden, no extensions visible. Turn off desktop notifications.
+- Browser A (alice) has two tabs: the GitHub repo page (you must be logged in to GitHub, the repo is private) and `http://localhost:8080/agent/`. Browser B (morgan) has one tab: `http://localhost:8080/agent/`.
+
+**Before the first take**
+
+```bash
+make doctor     # every line PASS or WARN
+make down       # only if a cluster from earlier runs exists
+make up         # fresh cluster, about 5 minutes
+make creds      # copy the passwords for alice and morgan
+```
+
+Do not run `make smoke` or `make demo` before the take: they create runs, drafts and audit rows, and the draft is then no longer #1.
+
+Type `make demo` in the terminal and do not press Enter yet.
+
+**Between takes**
+
+The cluster must be fresh for every take, so that the draft and the ERP order are both #1 and the audit log starts empty.
+
+1. `make down && make up` (about 5 minutes).
+2. `make creds`. The passwords are new after every `make up`.
+3. In both browser profiles, delete the cookies for `localhost:8080`, then reload `http://localhost:8080/agent/`. Both should show *Log in*.
+4. In the terminal, press Ctrl+L and type `make demo` again, without Enter.
+
+If the first `make demo` after `make up` takes longer than about 10 seconds, cut the wait in editing; the narration for shot 2 starts when the output appears.
