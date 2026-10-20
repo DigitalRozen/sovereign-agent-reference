@@ -123,5 +123,14 @@ done
 curl -fsS -o /dev/null http://localhost:8080/auth/realms/tarnwick \
   || { echo "Keycloak is not reachable on http://localhost:8080/auth" >&2; exit 1; }
 
+# The sandbox depends on NetworkPolicy, which some kernels (seen on WSL2 with Docker Desktop)
+# do not enforce. Test it for real instead of assuming it.
+if "$ROOT/scripts/netpol-check.sh"; then
+  echo "NetworkPolicy enforced: the sandbox namespace has no network."
+else
+  echo "WARNING: NetworkPolicy is NOT enforced on this machine (or the probe was inconclusive)." >&2
+  echo "WARNING: sandboxed code can reach the network; 'make smoke' will fail. See RUN_LOCAL.md." >&2
+fi
+
 echo "Cluster is up. Agent UI: http://localhost:8080/agent/  (model: $AGENT_MODEL)"
 echo "Run 'make smoke' to verify, 'make creds' for demo logins, 'make demo' for the scenario."

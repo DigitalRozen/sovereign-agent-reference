@@ -1,5 +1,6 @@
 #!/usr/bin/env bash
-# Check that this machine can run `make up`. Read-only: it changes nothing.
+# Check that this machine can run `make up`. Read-only, except that with a running cluster
+# it starts and deletes one short-lived probe pod to test NetworkPolicy enforcement.
 # Exit code 1 if any check FAILs; WARNs are printed but do not fail.
 set -uo pipefail
 
@@ -105,9 +106,14 @@ else
   pass "not applicable on $os"
 fi
 # k3s enforces NetworkPolicy with ipset. Without the kernel's ip_set support it skips
-# the policy controller and the sandbox keeps its network. Docker Desktop's VM kernel
-# is not visible from here; the k3s log check below covers that case.
-if [[ "$os" == "Linux" ]]; then
+# the policy controller and the sandbox keeps its network. k3s runs on Docker's kernel,
+# which with Docker Desktop is not this host's kernel; the probe below is what counts.
+docker_os="$(docker info --format '{{.OperatingSystem}}' 2>/dev/null || true)"
+docker_kernel="$(docker info --format '{{.KernelVersion}}' 2>/dev/null || true)"
+if [[ "$docker_os" == *"Docker Desktop"* ]]; then
+  warn "Docker Desktop: k3s runs on Docker's kernel ($docker_kernel), not this host's; the ip_set check below does not cover it. NetworkPolicy enforcement is only known from the cluster probe (see RUN_LOCAL.md)"
+fi
+if [[ "$os" == "Linux" && "$docker_os" != *"Docker Desktop"* ]]; then
   kver="$(uname -r)"
   if [[ -d /sys/module/ip_set ]]; then
     pass "ip_set kernel module loaded (NetworkPolicy can be enforced)"
@@ -128,6 +134,12 @@ if command -v k3d >/dev/null 2>&1 && k3d cluster list "$CLUSTER" >/dev/null 2>&1
     | grep -q 'Skipping network policy controller start, ipset save failed'; then
     warn "k3s skipped its network policy controller (ipset save failed): sandbox isolation is NOT enforced (see RUN_LOCAL.md)"
   fi
+  "$ROOT/scripts/netpol-check.sh"
+  case $? in
+    0) pass "NetworkPolicy enforced: a probe pod in the sandbox namespace cannot reach the Kubernetes API" ;;
+    1) warn "NetworkPolicy is NOT enforced: a probe pod in the sandbox namespace reached the Kubernetes API, so model-written code has network access (see RUN_LOCAL.md)" ;;
+    *) warn "NetworkPolicy probe was inconclusive (pod did not start or finish); is the cluster healthy?" ;;
+  esac
 else
   pass "no cluster '$CLUSTER' yet; 'make up' will create it"
 fi
