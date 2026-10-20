@@ -1,0 +1,17 @@
+.DS_Store
+.env
+.env.*
+!.env.example
+**/secrets/
+
+# Python
+__pycache__/
+*.py[cod]
+.venv/
+.pytest_cache/
+.ruff_cache/
+.coverage
+htmlcov/
+
+# Local cluster state
+*.kubeconfig

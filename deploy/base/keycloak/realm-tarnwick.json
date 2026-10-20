@@ -1,0 +1,181 @@
+{
+  "realm": "tarnwick",
+  "displayName": "Tarnwick Components (fictional)",
+  "enabled": true,
+  "sslRequired": "external",
+  "registrationAllowed": false,
+  "loginWithEmailAllowed": false,
+  "bruteForceProtected": true,
+  "accessTokenLifespan": 300,
+  "roles": {
+    "realm": [
+      {
+        "name": "buyer",
+        "description": "Can ask the agent to draft purchase orders"
+      },
+      {
+        "name": "procurement_manager",
+        "description": "Can approve and submit purchase orders"
+      },
+      {
+        "name": "viewer",
+        "description": "Read-only access to inventory and orders"
+      }
+    ]
+  },
+  "clients": [
+    {
+      "clientId": "agent-ui",
+      "name": "Procurement agent web UI",
+      "description": "Confidential client used by agent-api (authorization code flow with PKCE).",
+      "enabled": true,
+      "protocol": "openid-connect",
+      "publicClient": false,
+      "secret": "${AGENT_UI_CLIENT_SECRET}",
+      "standardFlowEnabled": true,
+      "directAccessGrantsEnabled": false,
+      "serviceAccountsEnabled": false,
+      "redirectUris": [
+        "http://localhost:8080/agent/*"
+      ],
+      "webOrigins": [
+        "http://localhost:8080"
+      ],
+      "attributes": {
+        "pkce.code.challenge.method": "S256"
+      },
+      "protocolMappers": [
+        {
+          "name": "audience-mcp-erp",
+          "protocol": "openid-connect",
+          "protocolMapper": "oidc-audience-mapper",
+          "config": {
+            "included.client.audience": "mcp-erp",
+            "access.token.claim": "true",
+            "id.token.claim": "false"
+          }
+        },
+        {
+          "name": "audience-sandbox-runner",
+          "protocol": "openid-connect",
+          "protocolMapper": "oidc-audience-mapper",
+          "config": {
+            "included.client.audience": "sandbox-runner",
+            "access.token.claim": "true",
+            "id.token.claim": "false"
+          }
+        }
+      ]
+    },
+    {
+      "clientId": "mcp-erp",
+      "name": "ERP tool server (resource server)",
+      "description": "Audience only. Never used to log in.",
+      "enabled": true,
+      "protocol": "openid-connect",
+      "publicClient": false,
+      "bearerOnly": true,
+      "standardFlowEnabled": false,
+      "directAccessGrantsEnabled": false
+    },
+    {
+      "clientId": "smoke-test",
+      "name": "Automated tests only",
+      "description": "Public client with the password grant so cluster tests can fetch tokens without a browser. Remove in any real deployment.",
+      "enabled": true,
+      "protocol": "openid-connect",
+      "publicClient": true,
+      "standardFlowEnabled": false,
+      "directAccessGrantsEnabled": true,
+      "protocolMappers": [
+        {
+          "name": "audience-mcp-erp",
+          "protocol": "openid-connect",
+          "protocolMapper": "oidc-audience-mapper",
+          "config": {
+            "included.client.audience": "mcp-erp",
+            "access.token.claim": "true",
+            "id.token.claim": "false"
+          }
+        },
+        {
+          "name": "audience-sandbox-runner",
+          "protocol": "openid-connect",
+          "protocolMapper": "oidc-audience-mapper",
+          "config": {
+            "included.client.audience": "sandbox-runner",
+            "access.token.claim": "true",
+            "id.token.claim": "false"
+          }
+        }
+      ]
+    },
+    {
+      "clientId": "sandbox-runner",
+      "name": "Code sandbox (resource server)",
+      "description": "Audience only. Never used to log in.",
+      "enabled": true,
+      "protocol": "openid-connect",
+      "publicClient": false,
+      "bearerOnly": true,
+      "standardFlowEnabled": false,
+      "directAccessGrantsEnabled": false
+    }
+  ],
+  "users": [
+    {
+      "username": "alice",
+      "firstName": "Alice",
+      "lastName": "Buyer",
+      "email": "alice@tarnwick.test",
+      "emailVerified": true,
+      "enabled": true,
+      "realmRoles": [
+        "buyer"
+      ],
+      "credentials": [
+        {
+          "type": "password",
+          "value": "${DEMO_PASSWORD_ALICE}",
+          "temporary": false
+        }
+      ]
+    },
+    {
+      "username": "morgan",
+      "firstName": "Morgan",
+      "lastName": "Manager",
+      "email": "morgan@tarnwick.test",
+      "emailVerified": true,
+      "enabled": true,
+      "realmRoles": [
+        "procurement_manager"
+      ],
+      "credentials": [
+        {
+          "type": "password",
+          "value": "${DEMO_PASSWORD_MORGAN}",
+          "temporary": false
+        }
+      ]
+    },
+    {
+      "username": "val",
+      "firstName": "Val",
+      "lastName": "Viewer",
+      "email": "val@tarnwick.test",
+      "emailVerified": true,
+      "enabled": true,
+      "realmRoles": [
+        "viewer"
+      ],
+      "credentials": [
+        {
+          "type": "password",
+          "value": "${DEMO_PASSWORD_VAL}",
+          "temporary": false
+        }
+      ]
+    }
+  ]
+}

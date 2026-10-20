@@ -1,0 +1,59 @@
+name: CI
+
+on:
+  push:
+    branches: [main]
+  pull_request:
+
+permissions:
+  contents: read
+
+jobs:
+  lint-test:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: astral-sh/setup-uv@v6
+      - run: uv sync --locked
+      - run: make lint
+      - run: make test
+
+  secrets-scan:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+      - name: gitleaks
+        run: |
+          docker run --rm -v "$PWD:/repo" zricethezav/gitleaks:v8.21.2 \
+            git /repo --redact --verbose --exit-code 1
+
+  k3d-smoke:
+    runs-on: ubuntu-latest
+    env:
+      K3D_VERSION: v5.8.3
+    steps:
+      - uses: actions/checkout@v4
+      - uses: astral-sh/setup-uv@v6
+      - run: uv sync --locked
+      - name: Install k3d
+        run: |
+          sudo curl -fsSL -o /usr/local/bin/k3d \
+            "https://github.com/k3d-io/k3d/releases/download/${K3D_VERSION}/k3d-linux-amd64"
+          sudo chmod +x /usr/local/bin/k3d
+          k3d version
+      - run: make up
+      - run: make smoke
+      - name: Cluster state on failure
+        if: failure()
+        run: |
+          kubectl get pods -A
+          kubectl -n platform logs statefulset/postgres --tail=100
+          kubectl -n platform logs deployment/keycloak --tail=100
+          kubectl -n platform logs deployment/litellm --tail=100
+          kubectl -n platform logs job/llm-key-bootstrap --tail=50
+          kubectl -n platform logs deployment/mcp-erp --tail=100
+          kubectl -n platform logs deployment/sandbox-runner --tail=100
+          kubectl -n sandbox get jobs,pods
+          kubectl -n platform logs deployment/agent-api --tail=100

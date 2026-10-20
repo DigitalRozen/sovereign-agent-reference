@@ -1,0 +1,74 @@
+apiVersion: apps/v1
+kind: StatefulSet
+metadata:
+  name: postgres
+  namespace: platform
+spec:
+  serviceName: postgres
+  replicas: 1
+  selector:
+    matchLabels:
+      app: postgres
+  template:
+    metadata:
+      labels:
+        app: postgres
+    spec:
+      securityContext:
+        runAsUser: 70 # postgres user in the alpine image
+        runAsGroup: 70
+        fsGroup: 70
+      containers:
+        - name: postgres
+          image: postgres:17.10-alpine
+          ports:
+            - containerPort: 5432
+          env:
+            - name: POSTGRES_DB
+              value: erp
+            - name: PGDATA
+              value: /var/lib/postgresql/data/pgdata
+            # Passwords come from a Secret created at runtime by scripts/up.sh, never from git.
+            - name: POSTGRES_PASSWORD
+              valueFrom:
+                secretKeyRef: { name: postgres-credentials, key: superuser-password }
+            - name: AI_READER_PASSWORD
+              valueFrom:
+                secretKeyRef: { name: postgres-credentials, key: ai-reader-password }
+            - name: AI_WRITER_PASSWORD
+              valueFrom:
+                secretKeyRef: { name: postgres-credentials, key: ai-writer-password }
+            - name: LITELLM_DB_PASSWORD
+              valueFrom:
+                secretKeyRef: { name: postgres-credentials, key: litellm-password }
+            - name: ERP_INTEGRATION_PASSWORD
+              valueFrom:
+                secretKeyRef: { name: postgres-credentials, key: erp-integration-password }
+            - name: AUDIT_READER_PASSWORD
+              valueFrom:
+                secretKeyRef: { name: postgres-credentials, key: audit-reader-password }
+          readinessProbe:
+            exec:
+              command: ["pg_isready", "-U", "postgres", "-d", "erp"]
+            periodSeconds: 5
+          resources:
+            requests: { cpu: 100m, memory: 256Mi }
+            limits: { memory: 512Mi }
+          volumeMounts:
+            - name: data
+              mountPath: /var/lib/postgresql/data
+            - name: init
+              mountPath: /docker-entrypoint-initdb.d
+              readOnly: true
+      volumes:
+        - name: init
+          configMap:
+            name: postgres-init
+  volumeClaimTemplates:
+    - metadata:
+        name: data
+      spec:
+        accessModes: ["ReadWriteOnce"]
+        resources:
+          requests:
+            storage: 1Gi

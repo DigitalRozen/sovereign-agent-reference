@@ -1,0 +1,64 @@
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: mcp-erp
+  namespace: platform
+spec:
+  replicas: 1
+  selector:
+    matchLabels:
+      app: mcp-erp
+  template:
+    metadata:
+      labels:
+        app: mcp-erp
+    spec:
+      automountServiceAccountToken: false
+      containers:
+        - name: mcp-erp
+          image: sovereign-agent/mcp-erp:dev
+          imagePullPolicy: Never
+          env:
+            - name: OIDC_ISSUER
+              value: http://localhost:8080/auth/realms/tarnwick
+            - name: OIDC_JWKS_URL
+              value: http://keycloak.platform.svc.cluster.local:8080/auth/realms/tarnwick/protocol/openid-connect/certs
+            - name: READER_PW
+              valueFrom: { secretKeyRef: { name: postgres-credentials, key: ai-reader-password } }
+            - name: WRITER_PW
+              valueFrom: { secretKeyRef: { name: postgres-credentials, key: ai-writer-password } }
+            - name: INTEGRATION_PW
+              valueFrom: { secretKeyRef: { name: postgres-credentials, key: erp-integration-password } }
+            - name: AI_READER_DSN
+              value: postgresql://ai_reader:$(READER_PW)@postgres.platform.svc.cluster.local:5432/erp
+            - name: AI_WRITER_DSN
+              value: postgresql://ai_writer:$(WRITER_PW)@postgres.platform.svc.cluster.local:5432/erp
+            - name: ERP_INTEGRATION_DSN
+              value: postgresql://erp_integration:$(INTEGRATION_PW)@postgres.platform.svc.cluster.local:5432/erp
+          ports:
+            - name: http
+              containerPort: 8000
+          readinessProbe:
+            httpGet: { path: /healthz, port: http }
+            periodSeconds: 5
+          resources:
+            requests: { cpu: 50m, memory: 128Mi }
+            limits: { memory: 256Mi }
+          securityContext:
+            allowPrivilegeEscalation: false
+            readOnlyRootFilesystem: true
+            runAsNonRoot: true
+            capabilities: { drop: ["ALL"] }
+---
+apiVersion: v1
+kind: Service
+metadata:
+  name: mcp-erp
+  namespace: platform
+spec:
+  selector:
+    app: mcp-erp
+  ports:
+    - name: http
+      port: 8000
+      targetPort: http

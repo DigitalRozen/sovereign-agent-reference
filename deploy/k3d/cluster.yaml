@@ -1,0 +1,21 @@
+# Single-node k3s cluster for the demo (see docs/adr/0001-single-node-k3d.md).
+# k3s is used instead of kind because its bundled network policy controller
+# actually enforces NetworkPolicy, which the code sandbox depends on.
+apiVersion: k3d.io/v1alpha5
+kind: Simple
+metadata:
+  name: sovereign-agent
+servers: 1
+agents: 0
+image: rancher/k3s:v1.36.5-k3s1
+ports:
+  # Ingress (Traefik, bundled with k3s) exposed on http://localhost:8080
+  - port: 8080:80
+    nodeFilters:
+      - loadbalancer
+options:
+  k3s:
+    extraArgs:
+      - arg: --disable=metrics-server
+        nodeFilters:
+          - server:*

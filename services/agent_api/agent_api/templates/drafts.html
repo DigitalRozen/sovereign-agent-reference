@@ -1,0 +1,35 @@
+{% extends "base.html" %}
+{% block title %}Drafts{% endblock %}
+{% block content %}
+{% if message %}<div class="banner">{{ message }}</div>{% endif %}
+<div class="card">
+  <h1>Purchase order drafts</h1>
+  <p class="muted small">The agent can only create drafts. An order exists in the ERP only after a
+     procurement manager approves it here, with their own login. The server rejects approval by
+     anyone else, and by the person who requested the draft.</p>
+  <table>
+    <tr><th>#</th><th>Material</th><th>Supplier</th><th>Quantity</th><th>Requested by</th>
+        <th>Rationale</th><th>Status</th><th></th></tr>
+    {% for d in drafts %}
+      <tr>
+        <td>{{ d.draft_id }}</td>
+        <td>{{ d.material_id }}</td>
+        <td>{{ d.supplier_id }}</td>
+        <td>{{ "{:,.0f}".format(d.quantity_kg) }} kg</td>
+        <td>{{ d.requested_by }}</td>
+        <td class="small">{{ d.rationale }}</td>
+        <td>{{ d.status }}</td>
+        <td>
+          {% if d.status == "pending_approval" %}
+            <form method="post" action="/agent/drafts/{{ d.draft_id }}/approve">
+              <button>Approve</button>
+            </form>
+          {% endif %}
+        </td>
+      </tr>
+    {% else %}
+      <tr><td colspan="8" class="muted">No drafts yet.</td></tr>
+    {% endfor %}
+  </table>
+</div>
+{% endblock %}

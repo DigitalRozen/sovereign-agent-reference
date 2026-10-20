@@ -1,0 +1,90 @@
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: agent-api
+  namespace: platform
+spec:
+  # Sessions and run transcripts are in memory: one replica only (see README limitations).
+  replicas: 1
+  selector:
+    matchLabels:
+      app: agent-api
+  template:
+    metadata:
+      labels:
+        app: agent-api
+    spec:
+      automountServiceAccountToken: false
+      containers:
+        - name: agent-api
+          image: sovereign-agent/agent-api:dev
+          imagePullPolicy: Never
+          env:
+            - name: AGENT_MODEL
+              value: agent-default  # set by scripts/up.sh from .env
+            - name: AGENT_UI_CLIENT_SECRET
+              valueFrom: { secretKeyRef: { name: keycloak-credentials, key: agent-ui-client-secret } }
+            # Per-user gateway keys: the agent spends each user's budget, not a shared one.
+            - name: LLM_KEY_ALICE
+              valueFrom: { secretKeyRef: { name: llm-keys, key: user-key-alice } }
+            - name: LLM_KEY_MORGAN
+              valueFrom: { secretKeyRef: { name: llm-keys, key: user-key-morgan } }
+            - name: LLM_KEY_VAL
+              valueFrom: { secretKeyRef: { name: llm-keys, key: user-key-val } }
+            - name: READER_PW
+              valueFrom: { secretKeyRef: { name: postgres-credentials, key: ai-reader-password } }
+            - name: WRITER_PW
+              valueFrom: { secretKeyRef: { name: postgres-credentials, key: ai-writer-password } }
+            - name: AUDIT_PW
+              valueFrom: { secretKeyRef: { name: postgres-credentials, key: audit-reader-password } }
+            - name: AI_READER_DSN
+              value: postgresql://ai_reader:$(READER_PW)@postgres.platform.svc.cluster.local:5432/erp
+            - name: AI_WRITER_DSN
+              value: postgresql://ai_writer:$(WRITER_PW)@postgres.platform.svc.cluster.local:5432/erp
+            - name: AUDIT_READER_DSN
+              value: postgresql://audit_reader:$(AUDIT_PW)@postgres.platform.svc.cluster.local:5432/erp
+          ports:
+            - name: http
+              containerPort: 8000
+          readinessProbe:
+            httpGet: { path: /agent/healthz, port: http }
+            periodSeconds: 5
+          resources:
+            requests: { cpu: 50m, memory: 128Mi }
+            limits: { memory: 384Mi }
+          securityContext:
+            allowPrivilegeEscalation: false
+            readOnlyRootFilesystem: true
+            runAsNonRoot: true
+            capabilities: { drop: ["ALL"] }
+---
+apiVersion: v1
+kind: Service
+metadata:
+  name: agent-api
+  namespace: platform
+spec:
+  selector:
+    app: agent-api
+  ports:
+    - name: http
+      port: 8000
+      targetPort: http
+---
+apiVersion: networking.k8s.io/v1
+kind: Ingress
+metadata:
+  name: agent-api
+  namespace: platform
+spec:
+  ingressClassName: traefik
+  rules:
+    - http:
+        paths:
+          - path: /agent
+            pathType: Prefix
+            backend:
+              service:
+                name: agent-api
+                port:
+                  name: http

@@ -1,0 +1,108 @@
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: keycloak
+  namespace: platform
+spec:
+  replicas: 1
+  selector:
+    matchLabels:
+      app: keycloak
+  template:
+    metadata:
+      labels:
+        app: keycloak
+    spec:
+      containers:
+        - name: keycloak
+          image: quay.io/keycloak/keycloak:26.7.5
+          # Dev mode: embedded H2 database, realm re-imported on every fresh pod.
+          # A real deployment runs `start` with an external database and TLS.
+          args: ["start-dev", "--import-realm"]
+          env:
+            # Browsers and in-cluster services must agree on the token issuer,
+            # so the public URL is fixed and backchannel URLs follow the request.
+            - name: KC_HOSTNAME
+              value: http://localhost:8080/auth
+            - name: KC_HOSTNAME_BACKCHANNEL_DYNAMIC
+              value: "true"
+            - name: KC_HTTP_RELATIVE_PATH
+              value: /auth
+            - name: KC_HTTP_ENABLED
+              value: "true"
+            - name: KC_PROXY_HEADERS
+              value: xforwarded
+            - name: KC_HEALTH_ENABLED
+              value: "true"
+            - name: KC_BOOTSTRAP_ADMIN_USERNAME
+              value: admin
+            - name: KC_BOOTSTRAP_ADMIN_PASSWORD
+              valueFrom:
+                secretKeyRef: { name: keycloak-credentials, key: admin-password }
+            # Placeholders in realm-tarnwick.json are resolved from these at import time.
+            - name: AGENT_UI_CLIENT_SECRET
+              valueFrom:
+                secretKeyRef: { name: keycloak-credentials, key: agent-ui-client-secret }
+            - name: DEMO_PASSWORD_ALICE
+              valueFrom:
+                secretKeyRef: { name: keycloak-credentials, key: demo-password-alice }
+            - name: DEMO_PASSWORD_MORGAN
+              valueFrom:
+                secretKeyRef: { name: keycloak-credentials, key: demo-password-morgan }
+            - name: DEMO_PASSWORD_VAL
+              valueFrom:
+                secretKeyRef: { name: keycloak-credentials, key: demo-password-val }
+          ports:
+            - name: http
+              containerPort: 8080
+            - name: management
+              containerPort: 9000
+          readinessProbe:
+            httpGet: { path: /auth/health/ready, port: management }
+            periodSeconds: 5
+            failureThreshold: 60
+          resources:
+            requests: { cpu: 250m, memory: 512Mi }
+            limits: { memory: 1Gi }
+          securityContext:
+            allowPrivilegeEscalation: false
+            runAsNonRoot: true
+          volumeMounts:
+            - name: realm
+              mountPath: /opt/keycloak/data/import
+              readOnly: true
+      volumes:
+        - name: realm
+          configMap:
+            name: keycloak-realm
+---
+apiVersion: v1
+kind: Service
+metadata:
+  name: keycloak
+  namespace: platform
+spec:
+  selector:
+    app: keycloak
+  ports:
+    - name: http
+      port: 8080
+      targetPort: http
+---
+apiVersion: networking.k8s.io/v1
+kind: Ingress
+metadata:
+  name: keycloak
+  namespace: platform
+spec:
+  ingressClassName: traefik
+  rules:
+    - http:
+        paths:
+          - path: /auth
+            pathType: Prefix
+            backend:
+              service:
+                name: keycloak
+                port:
+                  name: http

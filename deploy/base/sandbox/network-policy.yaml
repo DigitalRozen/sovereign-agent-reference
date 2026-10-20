@@ -1,0 +1,23 @@
+# Every pod in the sandbox namespace: no inbound, no outbound, not even DNS.
+# k3s ships a NetworkPolicy controller, so this is enforced (unlike kind's default CNI).
+apiVersion: networking.k8s.io/v1
+kind: NetworkPolicy
+metadata:
+  name: deny-all
+  namespace: sandbox
+spec:
+  podSelector: {}
+  policyTypes: ["Ingress", "Egress"]
+---
+# Bounds what the namespace can consume even if the runner misbehaves.
+apiVersion: v1
+kind: ResourceQuota
+metadata:
+  name: sandbox-quota
+  namespace: sandbox
+spec:
+  hard:
+    count/jobs.batch: "20"
+    pods: "5"
+    limits.cpu: "2"
+    limits.memory: 512Mi

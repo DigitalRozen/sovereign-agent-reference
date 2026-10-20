@@ -1,0 +1,60 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>{% block title %}Procurement agent{% endblock %} · Tarnwick (fictional)</title>
+  <style>
+    :root { --fg:#1d232b; --muted:#5f6b7a; --line:#dde3ea; --bg:#f6f8fa; --card:#fff;
+            --ok:#1a7f37; --bad:#c2271d; --warn:#9a6700; --accent:#2457c5; }
+    * { box-sizing: border-box; }
+    body { margin:0; font:15px/1.5 system-ui, -apple-system, "Segoe UI", sans-serif;
+           color:var(--fg); background:var(--bg); }
+    header { background:#11161d; color:#fff; padding:12px 24px; display:flex; gap:24px;
+             align-items:center; flex-wrap:wrap; }
+    header a { color:#cdd6e0; text-decoration:none; } header a:hover { color:#fff; }
+    header .brand { font-weight:600; color:#fff; margin-right:auto; }
+    header form { margin:0; }
+    main { max-width:1040px; margin:24px auto; padding:0 16px; }
+    .card { background:var(--card); border:1px solid var(--line); border-radius:8px;
+            padding:16px 20px; margin-bottom:16px; }
+    h1 { font-size:22px; margin:0 0 12px; } h2 { font-size:17px; margin:0 0 8px; }
+    .muted { color:var(--muted); } .small { font-size:13px; }
+    table { width:100%; border-collapse:collapse; font-size:14px; }
+    th, td { text-align:left; padding:6px 8px; border-bottom:1px solid var(--line);
+             vertical-align:top; }
+    th { color:var(--muted); font-weight:500; }
+    .pill { display:inline-block; padding:1px 8px; border-radius:10px; font-size:12px;
+            font-weight:600; border:1px solid currentColor; }
+    .ok { color:var(--ok); } .bad { color:var(--bad); } .warn { color:var(--warn); }
+    pre { background:#f0f3f6; padding:8px 10px; border-radius:6px; overflow:auto;
+          max-height:220px; font-size:12.5px; margin:6px 0 0; white-space:pre-wrap; }
+    textarea { width:100%; min-height:80px; font:inherit; padding:8px; border-radius:6px;
+               border:1px solid var(--line); }
+    button { background:var(--accent); color:#fff; border:0; border-radius:6px;
+             padding:7px 14px; font:inherit; cursor:pointer; }
+    button.secondary { background:#3b4552; }
+    .step { border-left:3px solid var(--line); padding:4px 0 8px 12px; margin:8px 0; }
+    .step.denied { border-color:var(--bad); } .step.allowed { border-color:var(--ok); }
+    .banner { padding:10px 14px; border-radius:6px; background:#eef4ff;
+              border:1px solid #c8d8ff; margin-bottom:16px; }
+  </style>
+</head>
+<body>
+<header>
+  <span class="brand">Procurement agent <span class="muted small">· Tarnwick Components (fictional)</span></span>
+  <a href="/agent/">Ask</a>
+  <a href="/agent/drafts">Drafts</a>
+  <a href="/agent/audit">Audit log</a>
+  {% if user %}
+    <span class="small">{{ user.username }} · {{ user.roles|join(", ") or "no app role" }}</span>
+    <form method="post" action="/agent/logout"><button class="secondary">Log out</button></form>
+  {% else %}
+    <a href="/agent/login"><button>Log in</button></a>
+  {% endif %}
+</header>
+<main>
+{% block content %}{% endblock %}
+</main>
+</body>
+</html>

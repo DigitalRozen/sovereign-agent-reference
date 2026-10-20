@@ -1,0 +1,38 @@
+{% extends "base.html" %}
+{% block content %}
+{% if not user %}
+  <div class="card">
+    <h1>Log in to use the agent</h1>
+    <p>Sign in through the company identity provider (Keycloak, OIDC with PKCE).
+       What the agent can do depends on <em>your</em> role: it acts with your token and your
+       LLM budget, never with privileges of its own.</p>
+    <p class="muted small">Demo users: <code>alice</code> (buyer), <code>morgan</code>
+       (procurement manager), <code>val</code> (viewer). Passwords: <code>make creds</code>.</p>
+  </div>
+{% else %}
+  <div class="card">
+    <h1>Ask the procurement agent</h1>
+    <form method="post" action="/agent/ask">
+      <textarea name="question">We are short on 6063 billet for the open window and solar orders. Check stock and prepare a purchase order if we need one.</textarea>
+      <p><button>Run agent</button>
+         <span class="muted small">Model behind the gateway: <code>{{ model }}</code></span></p>
+    </form>
+  </div>
+  <div class="card">
+    <h2>Your recent runs</h2>
+    <table>
+      <tr><th>Run</th><th>Question</th><th>Status</th><th>Tool calls</th></tr>
+      {% for run in runs %}
+        <tr>
+          <td><a href="/agent/runs/{{ run.id }}">{{ run.id }}</a></td>
+          <td>{{ run.question[:80] }}</td>
+          <td>{{ run.status }}</td>
+          <td>{{ run.steps|length }}</td>
+        </tr>
+      {% else %}
+        <tr><td colspan="4" class="muted">No runs yet.</td></tr>
+      {% endfor %}
+    </table>
+  </div>
+{% endif %}
+{% endblock %}

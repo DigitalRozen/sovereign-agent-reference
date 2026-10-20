@@ -1,0 +1,16 @@
+[project]
+name = "sandbox-runner"
+version = "0.1.0"
+description = "Runs untrusted, model-written Python as an isolated Kubernetes Job."
+requires-python = ">=3.12"
+dependencies = [
+    "fastapi>=0.115",
+    "kubernetes==36.0.3",
+    "psycopg[binary]>=3.2",
+    "pyjwt[crypto]>=2.10",
+    "uvicorn>=0.32",
+]
+
+[build-system]
+requires = ["hatchling"]
+build-backend = "hatchling.build"

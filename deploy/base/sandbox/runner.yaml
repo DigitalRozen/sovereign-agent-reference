@@ -1,0 +1,91 @@
+# The runner's only Kubernetes permissions: manage Jobs and read their pods and logs,
+# in the sandbox namespace only.
+apiVersion: v1
+kind: ServiceAccount
+metadata:
+  name: sandbox-runner
+  namespace: platform
+---
+apiVersion: rbac.authorization.k8s.io/v1
+kind: Role
+metadata:
+  name: sandbox-runner
+  namespace: sandbox
+rules:
+  - apiGroups: ["batch"]
+    resources: ["jobs"]
+    verbs: ["create", "get", "delete"]
+  - apiGroups: [""]
+    resources: ["pods", "pods/log"]
+    verbs: ["get", "list"]
+---
+apiVersion: rbac.authorization.k8s.io/v1
+kind: RoleBinding
+metadata:
+  name: sandbox-runner
+  namespace: sandbox
+subjects:
+  - kind: ServiceAccount
+    name: sandbox-runner
+    namespace: platform
+roleRef:
+  apiGroup: rbac.authorization.k8s.io
+  kind: Role
+  name: sandbox-runner
+---
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: sandbox-runner
+  namespace: platform
+spec:
+  replicas: 1
+  selector:
+    matchLabels:
+      app: sandbox-runner
+  template:
+    metadata:
+      labels:
+        app: sandbox-runner
+    spec:
+      serviceAccountName: sandbox-runner
+      containers:
+        - name: sandbox-runner
+          image: sovereign-agent/sandbox-runner:dev
+          imagePullPolicy: Never
+          env:
+            - name: OIDC_ISSUER
+              value: http://localhost:8080/auth/realms/tarnwick
+            - name: OIDC_JWKS_URL
+              value: http://keycloak.platform.svc.cluster.local:8080/auth/realms/tarnwick/protocol/openid-connect/certs
+            - name: WRITER_PW
+              valueFrom: { secretKeyRef: { name: postgres-credentials, key: ai-writer-password } }
+            - name: AUDIT_DSN
+              value: postgresql://ai_writer:$(WRITER_PW)@postgres.platform.svc.cluster.local:5432/erp
+          ports:
+            - name: http
+              containerPort: 8000
+          readinessProbe:
+            httpGet: { path: /healthz, port: http }
+            periodSeconds: 5
+          resources:
+            requests: { cpu: 50m, memory: 128Mi }
+            limits: { memory: 256Mi }
+          securityContext:
+            allowPrivilegeEscalation: false
+            readOnlyRootFilesystem: true
+            runAsNonRoot: true
+            capabilities: { drop: ["ALL"] }
+---
+apiVersion: v1
+kind: Service
+metadata:
+  name: sandbox-runner
+  namespace: platform
+spec:
+  selector:
+    app: sandbox-runner
+  ports:
+    - name: http
+      port: 8000
+      targetPort: http

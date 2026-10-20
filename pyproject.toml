@@ -1,0 +1,51 @@
+[project]
+name = "sovereign-agent-reference"
+version = "0.1.0"
+description = "Reference architecture for a governed enterprise agent on Kubernetes (demo, not production)."
+readme = "README.md"
+license = "MIT"
+requires-python = ">=3.12"
+dependencies = []
+
+[dependency-groups]
+dev = [
+    "agent-api",
+    "httpx>=0.28.1",
+    "mcp-erp",
+    "pyjwt[crypto]>=2.15.1",
+    "pytest>=8",
+    "ruff>=0.6",
+    "sandbox-runner",
+    "scripted-llm",
+]
+
+[tool.uv]
+package = false
+
+[tool.uv.workspace]
+members = ["services/*"]
+
+[tool.uv.sources]
+scripted-llm = { workspace = true }
+mcp-erp = { workspace = true }
+sandbox-runner = { workspace = true }
+agent-api = { workspace = true }
+
+[tool.ruff]
+line-length = 100
+target-version = "py312"
+
+[tool.ruff.lint]
+select = ["E", "F", "I", "B", "UP", "S"]
+
+[tool.ruff.lint.flake8-bugbear]
+# FastAPI declares dependencies as argument defaults.
+extend-immutable-calls = ["fastapi.Depends", "fastapi.Form", "fastapi.Header"]
+
+[tool.ruff.lint.per-file-ignores]
+"**/tests/**" = ["S101", "S603", "S607", "S608"]  # tests build SQL from their own fixed values
+"**/scripted_llm/app.py" = ["S104"]
+
+[tool.pytest.ini_options]
+testpaths = ["tests", "services"]
+markers = ["cluster: needs the running k3d cluster (make up)"]

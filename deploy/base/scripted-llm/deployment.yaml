@@ -1,0 +1,48 @@
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: scripted-llm
+  namespace: platform
+spec:
+  replicas: 1
+  selector:
+    matchLabels:
+      app: scripted-llm
+  template:
+    metadata:
+      labels:
+        app: scripted-llm
+    spec:
+      automountServiceAccountToken: false
+      containers:
+        - name: scripted-llm
+          # Built locally and imported into k3d by scripts/up.sh.
+          image: sovereign-agent/scripted-llm:dev
+          imagePullPolicy: Never
+          ports:
+            - name: http
+              containerPort: 8000
+          readinessProbe:
+            httpGet: { path: /healthz, port: http }
+            periodSeconds: 5
+          resources:
+            requests: { cpu: 50m, memory: 64Mi }
+            limits: { memory: 128Mi }
+          securityContext:
+            allowPrivilegeEscalation: false
+            readOnlyRootFilesystem: true
+            runAsNonRoot: true
+            capabilities: { drop: ["ALL"] }
+---
+apiVersion: v1
+kind: Service
+metadata:
+  name: scripted-llm
+  namespace: platform
+spec:
+  selector:
+    app: scripted-llm
+  ports:
+    - name: http
+      port: 8000
+      targetPort: http

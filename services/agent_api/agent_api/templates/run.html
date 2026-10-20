@@ -1,0 +1,37 @@
+{% extends "base.html" %}
+{% block title %}Run {{ run.id }}{% endblock %}
+{% block content %}
+<div class="card">
+  <h1>Run {{ run.id }}</h1>
+  <p class="muted small">Asked by {{ run.username }} · model <code>{{ run.model }}</code> ·
+     {{ run.llm_calls }} LLM calls through the gateway · status {{ run.status }}</p>
+  <p><strong>Question:</strong> {{ run.question }}</p>
+</div>
+
+<div class="card">
+  <h2>What the agent did</h2>
+  {% for step in run.steps %}
+    <div class="step {{ 'allowed' if step.ok else 'denied' }}">
+      <strong>{{ step.name }}</strong>
+      {% if step.ok %}<span class="pill ok">allowed</span>
+      {% else %}<span class="pill bad">{{ 'refused' if step.kind == 'refused' else 'denied / failed' }}</span>{% endif %}
+      <span class="muted small">{{ step.ms }} ms</span>
+      {% if step.name == "run_python" %}
+        <pre>{{ step.args.get("code", "") }}</pre>
+        <div class="muted small">input: {{ step.args.get("input") }}</div>
+      {% elif step.args %}
+        <div class="muted small">args: {{ step.args }}</div>
+      {% endif %}
+      <pre>{{ step.result }}</pre>
+    </div>
+  {% else %}
+    <p class="muted">No tool calls.</p>
+  {% endfor %}
+</div>
+
+<div class="card">
+  <h2>Answer</h2>
+  <p>{{ run.answer }}</p>
+  <p><a href="/agent/drafts">Go to drafts</a> · <a href="/agent/audit">See the audit log</a></p>
+</div>
+{% endblock %}

@@ -1,0 +1,28 @@
+# LiteLLM gateway configuration. Every LLM call in the system goes through here,
+# authenticated by a per-user virtual key that carries that user's budget and limits.
+model_list:
+  # Default: deterministic local model. No API key, no data leaves the cluster.
+  - model_name: agent-default
+    litellm_params:
+      model: openai/scripted
+      api_base: http://scripted-llm.platform.svc.cluster.local:8000/v1
+      api_key: unused
+    model_info:
+      # Notional prices so spend attribution and budgets are exercised with the mock.
+      input_cost_per_token: 0.00001
+      output_cost_per_token: 0.00003
+
+  # Real model via OpenRouter. Used only when OPENROUTER_API_KEY is set in .env.
+  # Change the model here; keys are scoped to these two model names.
+  - model_name: agent-openrouter
+    litellm_params:
+      model: openrouter/anthropic/claude-haiku-4.5
+      api_key: os.environ/OPENROUTER_API_KEY
+
+general_settings:
+  master_key: os.environ/LITELLM_MASTER_KEY
+  database_url: os.environ/DATABASE_URL
+
+litellm_settings:
+  drop_params: true
+  request_timeout: 60

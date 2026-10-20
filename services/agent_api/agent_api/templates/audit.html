@@ -1,0 +1,22 @@
+{% extends "base.html" %}
+{% block title %}Audit log{% endblock %}
+{% block content %}
+<div class="card">
+  <h1>Audit log</h1>
+  <p class="muted small">Append-only: the database rejects updates and deletes on this table.
+     Written by the tool server, the sandbox and the agent; read here with a read-only role.</p>
+  <table>
+    <tr><th>#</th><th>Time (UTC)</th><th>Actor</th><th>Action</th><th>Decision</th><th>Detail</th></tr>
+    {% for e in events %}
+      <tr>
+        <td>{{ e.event_id }}</td>
+        <td class="small">{{ e.occurred_at.strftime("%H:%M:%S") }}</td>
+        <td>{{ e.actor }}</td>
+        <td>{{ e.action }}</td>
+        <td><span class="pill {{ {'allowed': 'ok', 'denied': 'bad'}.get(e.decision, 'warn') }}">{{ e.decision }}</span></td>
+        <td class="small">{{ e.detail.get("reason") or e.detail.get("tool") or e.detail.get("status") or "" }}</td>
+      </tr>
+    {% endfor %}
+  </table>
+</div>
+{% endblock %}

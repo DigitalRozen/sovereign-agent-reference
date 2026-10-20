@@ -1,0 +1,67 @@
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: litellm
+  namespace: platform
+spec:
+  replicas: 1
+  selector:
+    matchLabels:
+      app: litellm
+  template:
+    metadata:
+      labels:
+        app: litellm
+    spec:
+      automountServiceAccountToken: false
+      containers:
+        - name: litellm
+          # Pinned by digest: the gateway sees every prompt and holds provider keys.
+          image: ghcr.io/berriai/litellm-database:v1.83.14-stable.patch.3@sha256:ec721a5e4b0decb3658c74b696e315dc3e1c664adbfbadded0564ee2d6cc03bc
+          args: ["--config", "/config/config.yaml", "--port", "4000"]
+          env:
+            - name: LITELLM_MASTER_KEY
+              valueFrom:
+                secretKeyRef: { name: llm-keys, key: master-key }
+            - name: LITELLM_DB_PASSWORD
+              valueFrom:
+                secretKeyRef: { name: postgres-credentials, key: litellm-password }
+            - name: DATABASE_URL
+              value: postgresql://litellm:$(LITELLM_DB_PASSWORD)@postgres.platform.svc.cluster.local:5432/litellm
+            - name: OPENROUTER_API_KEY
+              valueFrom:
+                secretKeyRef: { name: llm-keys, key: openrouter-api-key, optional: true }
+          ports:
+            - name: http
+              containerPort: 4000
+          readinessProbe:
+            httpGet: { path: /health/readiness, port: http }
+            periodSeconds: 5
+            failureThreshold: 60
+          resources:
+            requests: { cpu: 200m, memory: 512Mi }
+            limits: { memory: 1536Mi }
+          securityContext:
+            allowPrivilegeEscalation: false
+          volumeMounts:
+            - name: config
+              mountPath: /config
+              readOnly: true
+      volumes:
+        - name: config
+          configMap:
+            name: litellm-config
+---
+# Cluster-internal only. There is deliberately no Ingress for the gateway.
+apiVersion: v1
+kind: Service
+metadata:
+  name: litellm
+  namespace: platform
+spec:
+  selector:
+    app: litellm
+  ports:
+    - name: http
+      port: 4000
+      targetPort: http

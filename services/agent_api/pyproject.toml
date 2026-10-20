@@ -1,0 +1,22 @@
+[project]
+name = "agent-api"
+version = "0.1.0"
+description = "Procurement agent: OIDC login, tool-calling loop over MCP and the sandbox, approval UI."
+requires-python = ">=3.12"
+dependencies = [
+    "fastapi>=0.115",
+    "httpx>=0.28",
+    "jinja2>=3.1",
+    "mcp==2.3.0",
+    "psycopg[binary]>=3.2",
+    "pyjwt[crypto]>=2.10",
+    "python-multipart>=0.0.9",
+    "uvicorn>=0.32",
+]
+
+[build-system]
+requires = ["hatchling"]
+build-backend = "hatchling.build"
+
+[tool.hatch.build.targets.wheel]
+packages = ["agent_api"]
