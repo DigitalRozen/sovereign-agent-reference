@@ -49,7 +49,7 @@ Type `make demo` in the terminal and do not press Enter yet.
 
 **Between takes**
 
-1. `make reset-demo` (about 30 seconds). It also ends every Keycloak session, so both browser profiles show *Log in* after a reload. The passwords do not change.
+1. `make reset-demo` (well under a minute). It also ends every Keycloak session, so both browser profiles show *Log in* after a reload. The passwords do not change.
 2. In both browser profiles, reload `http://localhost:8080/agent/`.
 3. In the terminal, press Ctrl+L and type `make demo` again, without Enter.
 
