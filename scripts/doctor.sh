@@ -33,9 +33,11 @@ else
 fi
 
 echo "Tools"
-for bin in docker k3d kubectl openssl curl uv make; do
+for bin in docker k3d kubectl openssl curl uv make column; do
   if command -v "$bin" >/dev/null 2>&1; then
     pass "$bin"
+  elif [[ "$bin" == column ]]; then
+    fail "column not found on PATH; 'make demo' and 'make audit' need it (Debian/Ubuntu: sudo apt-get install bsdextrautils)"
   else
     fail "$bin not found on PATH"
   fi
@@ -91,7 +93,7 @@ else
   fi
 fi
 
-echo "Kernel limits"
+echo "Kernel"
 if [[ "$os" == "Linux" && -r /proc/sys/fs/inotify/max_user_instances ]]; then
   inst="$(cat /proc/sys/fs/inotify/max_user_instances)"
   if ((inst < 512)); then
@@ -102,12 +104,30 @@ if [[ "$os" == "Linux" && -r /proc/sys/fs/inotify/max_user_instances ]]; then
 else
   pass "not applicable on $os"
 fi
+# k3s enforces NetworkPolicy with ipset. Without the kernel's ip_set support it skips
+# the policy controller and the sandbox keeps its network. Docker Desktop's VM kernel
+# is not visible from here; the k3s log check below covers that case.
+if [[ "$os" == "Linux" ]]; then
+  kver="$(uname -r)"
+  if [[ -d /sys/module/ip_set ]]; then
+    pass "ip_set kernel module loaded (NetworkPolicy can be enforced)"
+  elif grep -qs '/ip_set\.ko' "/lib/modules/$kver/modules.builtin" "/lib/modules/$kver/modules.dep" \
+    || zgrep -qsE '^CONFIG_IP_SET=(y|m)' /proc/config.gz 2>/dev/null; then
+    pass "ip_set kernel support available (NetworkPolicy can be enforced)"
+  else
+    warn "no ip_set support found in kernel $kver; k3s will not enforce NetworkPolicy and the sandbox will have network access (see RUN_LOCAL.md)"
+  fi
+fi
 
 echo "Cluster and port $PORT"
 cluster_exists=false
 if command -v k3d >/dev/null 2>&1 && k3d cluster list "$CLUSTER" >/dev/null 2>&1; then
   cluster_exists=true
   pass "cluster '$CLUSTER' exists; 'make up' will reuse it"
+  if docker logs "k3d-$CLUSTER-server-0" 2>&1 \
+    | grep -q 'Skipping network policy controller start, ipset save failed'; then
+    warn "k3s skipped its network policy controller (ipset save failed): sandbox isolation is NOT enforced (see RUN_LOCAL.md)"
+  fi
 else
   pass "no cluster '$CLUSTER' yet; 'make up' will create it"
 fi

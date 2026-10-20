@@ -11,7 +11,7 @@ Everything runs on one machine in a single-node k3s cluster inside Docker (k3d).
 | CPUs available to Docker | 2 | 4+ |
 | Free disk for Docker images | 15 GB | 25 GB |
 
-Tools: Docker, [k3d](https://k3d.io) v5.8+, kubectl, openssl, curl, make and [uv](https://docs.astral.sh/uv/). CI uses k3d v5.8.3.
+Tools: Docker, [k3d](https://k3d.io) v5.8+, kubectl, openssl, curl, make, `column` and [uv](https://docs.astral.sh/uv/). CI uses k3d v5.8.3. `column` is used by `make demo` and `make audit`; on Debian and Ubuntu it is in the `bsdextrautils` package.
 
 Install on Ubuntu (native or WSL2), after Docker itself:
 
@@ -19,7 +19,7 @@ Install on Ubuntu (native or WSL2), after Docker itself:
 curl -s https://raw.githubusercontent.com/k3d-io/k3d/main/install.sh | TAG=v5.8.3 bash
 sudo snap install kubectl --classic     # or follow https://kubernetes.io/docs/tasks/tools/
 curl -LsSf https://astral.sh/uv/install.sh | sh
-sudo apt-get install -y make openssl curl
+sudo apt-get install -y make openssl curl bsdextrautils
 ```
 
 **WSL2:** use Docker Desktop with WSL integration enabled, or Docker Engine installed inside the distro. Docker Desktop on WSL2 gets its memory from `%UserProfile%\.wslconfig` (`[wsl2]` → `memory=12GB`); restart WSL (`wsl --shutdown`) after changing it. Clone the repo inside the Linux filesystem (`~/...`), not under `/mnt/c`.
@@ -71,6 +71,7 @@ Locally built images (`sovereign-agent/*:dev`) stay in Docker; remove them with 
 | Keycloak is not reachable on `http://localhost:8080/auth` | Traefik is still starting, or Keycloak ran out of memory. Check `kubectl -n platform get pods` and Docker's memory limit. |
 | Image pulls fail or hit rate limits | Check network or proxy access to Docker Hub, quay.io and ghcr.io, then re-run `make up`. |
 | A pod stays in `ErrImageNeverPull` | The images are built locally and imported, never pulled. When the disk is nearly full, k3s can garbage-collect images that no pod uses yet. Free disk space (`make doctor` checks it), then `make down && make up`. |
+| The k3s log says `Skipping network policy controller start, ipset save failed` (see it with `docker logs k3d-sovereign-agent-server-0`) | The host kernel has no `ip_set` support, so k3s does not enforce NetworkPolicy. **Sandbox isolation is then NOT enforced**: model-written code can reach the network, and `make smoke` fails `test_no_network_not_even_cluster_dns_or_the_kube_api`. `make doctor` warns about this. Use a kernel with `CONFIG_IP_SET` (load it with `sudo modprobe ip_set` if it is a module), then `make down && make up`. |
 | You want a clean slate | `make down && make up`. New passwords are generated; run `make creds` again. |
 
 For anything else, `kubectl get pods -A` and the logs of the failing pod are the starting point; the CI workflow's *Cluster state on failure* step lists the useful commands.
