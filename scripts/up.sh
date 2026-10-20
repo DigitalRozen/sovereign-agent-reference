@@ -123,8 +123,9 @@ done
 curl -fsS -o /dev/null http://localhost:8080/auth/realms/tarnwick \
   || { echo "Keycloak is not reachable on http://localhost:8080/auth" >&2; exit 1; }
 
-# The sandbox depends on NetworkPolicy, which some kernels (seen on WSL2 with Docker Desktop)
-# do not enforce. Test it for real instead of assuming it.
+# The sandbox depends on NetworkPolicy, which some hosts do not enforce at all (the sandbox
+# guard covers hosts that enforce it late, as seen on WSL2 with Docker Desktop).
+# Test it for real instead of assuming it.
 if "$ROOT/scripts/netpol-check.sh"; then
   echo "NetworkPolicy enforced: the sandbox namespace has no network."
 else

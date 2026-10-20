@@ -21,6 +21,8 @@ Each run is a one-shot **Kubernetes Job** in the `sandbox` namespace, created by
 - Cluster tests run hostile code: network probes against the internet, cluster DNS and the kube API; credential and filesystem checks; an infinite loop; a memory bomb (`tests/cluster/test_sandbox.py`).
 - Start-up latency is a few seconds per run. That is acceptable for an agent step, but not for interactive notebooks.
 
+NetworkPolicy is applied asynchronously. On WSL2 with Docker Desktop a new pod could reach the network for about two seconds before its policy was in place. The Job therefore runs a short guard first: it connects to the Kubernetes API service, which is always reachable when nothing filters, and starts the model's code only once that connection is blocked. If it is still reachable after 8 seconds, the run fails with exit 97 and the code never runs.
+
 ## What this does not give
 
 - **Kernel isolation.** The code shares the node's kernel. A container escape reaches the node. The next step is a `RuntimeClass` with gVisor or Kata Containers, which changes one field in the Job spec. It is listed as a stretch goal, because nested virtualization on WSL2 is unreliable.
