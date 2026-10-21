@@ -51,3 +51,17 @@ fi
 echo "Gateway spend reset to 0 for ${reset[*]}; restarting the gateway so it counts."
 kubectl -n "$NS" rollout restart deployment/litellm >/dev/null
 kubectl -n "$NS" rollout status deployment/litellm --timeout=300s >/dev/null
+# rollout status returns while the old pod is still terminating; requests to the Service
+# right then failed to connect. Wait until only the new pod is left.
+for _ in $(seq 120); do
+  [[ "$(kubectl -n "$NS" get pods -l app=litellm --no-headers 2>/dev/null | wc -l)" == 1 ]] && break
+  sleep 1
+done
+# Then check the path the agent uses: from the agent-api pod, through the Service.
+probe='import httpx; httpx.get("http://litellm.platform.svc.cluster.local:4000/health/liveliness", timeout=3).raise_for_status()'
+for _ in $(seq 60); do
+  kubectl -n "$NS" exec deploy/agent-api -- python -c "$probe" >/dev/null 2>&1 && exit 0
+  sleep 1
+done
+echo "the gateway did not answer through its Service within 60 s after the restart" >&2
+exit 1
