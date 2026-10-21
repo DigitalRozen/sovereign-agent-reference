@@ -17,7 +17,10 @@ for bin in docker k3d kubectl openssl curl; do
   command -v "$bin" >/dev/null || { echo "missing required tool: $bin" >&2; exit 1; }
 done
 
-# Optional settings (e.g. OPENROUTER_API_KEY) come from .env, which is never committed.
+# Optional settings (e.g. OPENROUTER_API_KEY) come from .env, which is never committed, and
+# only from there: a key left in the shell would otherwise silently switch the model (and
+# send requests out) while .env and make doctor say the scripted model is in use.
+unset OPENROUTER_API_KEY
 if [[ -f "$ROOT/.env" ]]; then
   set -a
   # shellcheck disable=SC1091

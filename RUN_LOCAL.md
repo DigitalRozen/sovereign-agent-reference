@@ -53,7 +53,7 @@ Then open **http://localhost:8080/agent/**. Log in as `alice` (buyer) and run th
 
 ## 4. Using a real model
 
-Set `OPENROUTER_API_KEY` in `.env` and run `make up` again. The key is passed to the cluster on stdin and stored as a Kubernetes Secret; the gateway restarts to pick it up and the agent switches to the `agent-openrouter` model. Agent prompts and ERP data the agent reads are then sent to OpenRouter. To go back to the scripted model, empty the key and run `make up` again; the old key stays in the cluster Secret until `make down`.
+Set `OPENROUTER_API_KEY` in `.env` and run `make up` again. Only `.env` counts: a key exported in your shell is ignored, and `make doctor` warns about it. The key is passed to the cluster on stdin and stored as a Kubernetes Secret; the gateway restarts to pick it up and the agent switches to the `agent-openrouter` model. Agent prompts and ERP data the agent reads are then sent to OpenRouter. To go back to the scripted model, empty the key and run `make up` again; the old key stays in the cluster Secret until `make down`.
 
 ## 5. Stop and clean up
 

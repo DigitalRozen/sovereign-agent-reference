@@ -97,6 +97,7 @@ def test_guard_refuses_to_run_code_while_the_network_is_reachable():
         result = run_guarded(listener.getsockname(), "print('ran')")
     assert result.returncode == NOT_ISOLATED_EXIT
     assert "ran" not in result.stdout
+    assert "waiting for network isolation" in result.stderr
     assert "not isolated" in result.stderr
 
 

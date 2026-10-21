@@ -46,25 +46,31 @@ for _ in $(seq 60); do
   sleep 1
 done
 kubectl -n platform scale deployment/agent-api --replicas=1 >/dev/null
-kubectl -n platform rollout status deployment/agent-api --timeout=120s >/dev/null
+kubectl -n platform rollout status deployment/agent-api --timeout=300s >/dev/null
+# Slow machines answer 502/503/504 for a while after the pod is ready; keep asking (up to
+# 5 minutes) until five answers in a row are healthy.
 ok=0
-for _ in $(seq 90); do
-  if [[ "$(status)" == 200 ]]; then ok=$((ok + 1)); else ok=0; fi
+for i in $(seq 300); do
+  code="$(status)"
+  if [[ "$code" == 200 ]]; then ok=$((ok + 1)); else ok=0; fi
   ((ok >= 5)) && break
+  ((i % 15 == 0)) && echo "   still waiting for agent-api (last answer: ${code:-none})"
   sleep 1
 done
-((ok >= 5)) || { echo "agent-api is not answering steadily on $BASE/agent/" >&2; exit 1; }
+((ok >= 5)) || { echo "agent-api did not answer steadily on $BASE/agent/ within 5 minutes" >&2; exit 1; }
 
 echo "== Keycloak: ending every session in realm tarnwick"
 admin_password="$(kubectl -n platform get secret keycloak-credentials \
   -o jsonpath='{.data.admin-password}' | base64 -d)"
 # The password goes on stdin so it never appears in a process listing.
 admin_token="$(printf '%s' "$admin_password" |
-  curl -fsS "$BASE/auth/realms/master/protocol/openid-connect/token" \
+  curl -fsS --retry 10 --retry-all-errors --retry-delay 2 \
+    "$BASE/auth/realms/master/protocol/openid-connect/token" \
     -d grant_type=password -d client_id=admin-cli -d username=admin \
     --data-urlencode password@- |
   python3 -c 'import json,sys; print(json.load(sys.stdin)["access_token"])')"
-curl -fsS -o /dev/null -X POST -H "Authorization: Bearer $admin_token" \
+curl -fsS --retry 10 --retry-all-errors --retry-delay 2 -o /dev/null -X POST \
+  -H "Authorization: Bearer $admin_token" \
   "$BASE/auth/admin/realms/tarnwick/logout-all"
 
 counts="$(psql_erp -tA -c "SELECT (SELECT count(*) FROM ai.po_drafts) || ' drafts, '
