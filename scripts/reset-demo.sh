@@ -1,6 +1,7 @@
 #!/usr/bin/env bash
 # Put the running demo back to its seed state for a clean recording take: no drafts, no ERP
-# orders, no agent runs or app sessions, nobody logged in to Keycloak, and an empty audit log.
+# orders, no agent runs or app sessions, nobody logged in to Keycloak, no gateway spend, and an
+# empty audit log.
 # The old audit table is not emptied (it cannot be): it is renamed and stays append-only.
 set -euo pipefail
 
@@ -72,6 +73,9 @@ admin_token="$(printf '%s' "$admin_password" |
 curl -fsS --retry 10 --retry-all-errors --retry-delay 2 -o /dev/null -X POST \
   -H "Authorization: Bearer $admin_token" \
   "$BASE/auth/admin/realms/tarnwick/logout-all"
+
+echo "== LLM gateway: demo users' spend back to 0"
+"$(dirname "$0")/reset-llm-spend.sh"
 
 counts="$(psql_erp -tA -c "SELECT (SELECT count(*) FROM ai.po_drafts) || ' drafts, '
   || (SELECT count(*) FROM erp.purchase_orders) || ' ERP orders, '

@@ -163,6 +163,7 @@ def test_viewer_gets_answers_but_cannot_run_code_or_draft(user_token, psql):
     )
     assert response.status_code == 200, response.text
     run = response.json()
-    sandbox = next(s for s in run["steps"] if s["name"] == "run_python")
+    sandbox = next((s for s in run["steps"] if s["name"] == "run_python"), None)
+    assert sandbox is not None, run
     assert not sandbox["ok"] and "(403)" in sandbox["result"]
     assert not any(s["name"] == "draft_po" and s["ok"] for s in run["steps"])

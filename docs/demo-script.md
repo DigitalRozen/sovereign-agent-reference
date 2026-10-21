@@ -39,7 +39,7 @@ Every spoken line has 12 words or fewer. A `/` separates lines; pause briefly at
 ```bash
 make doctor       # every line PASS or WARN
 make up           # about 5 minutes on a new cluster; safe to re-run on an existing one
-make reset-demo   # no drafts, no orders, no runs, nobody logged in, empty audit log
+make reset-demo   # no drafts, no orders, no runs, nobody logged in, no gateway spend, empty audit log
 make creds        # copy the passwords for alice and morgan
 ```
 

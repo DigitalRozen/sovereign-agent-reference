@@ -61,6 +61,22 @@ jobs:
           time make reset-demo
           make demo | tee demo.txt
           grep -q 'Drafted purchase order #1 for' demo.txt
+      # The WSL2 failure on a kept cluster: earlier runs had used up val's USD 0.05 budget,
+      # the gateway refused the agent, and the viewer test found no sandbox step.
+      - name: smoke on a kept cluster is not blocked by budget spent in earlier runs
+        run: |
+          key() { kubectl -n platform get secret llm-keys -o jsonpath="{.data.$1}" | base64 -d; }
+          kubectl -n platform port-forward svc/litellm 14002:4000 >/dev/null 2>&1 &
+          for _ in $(seq 50); do curl -s -o /dev/null localhost:14002/health/liveliness && break; sleep 0.2; done
+          curl -fsS -o /dev/null -H "Authorization: Bearer $(key master-key)" -H 'Content-Type: application/json' \
+            localhost:14002/key/update -d "{\"key\": \"$(key user-key-val)\", \"spend\": 1.0}"
+          code="$(curl -s -o /dev/null -w '%{http_code}' -H "Authorization: Bearer $(key user-key-val)" \
+            -H 'Content-Type: application/json' localhost:14002/v1/chat/completions \
+            -d '{"model": "agent-default", "messages": [{"role": "user", "content": "hi"}]}')"
+          kill %1
+          echo "val after spending its budget: HTTP $code"
+          [[ "$code" == 400 || "$code" == 429 ]]
+          uv run pytest -q -m cluster tests/cluster/test_e2e.py -k viewer
       # The WSL2 failure: make up on an existing cluster kept the old sandbox-runner pod
       # (fixed ":dev" tag, "unchanged" Deployment), so sandbox runs lacked the network guard.
       - name: make up after a code change rolls new service pods
