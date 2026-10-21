@@ -70,6 +70,12 @@ jobs:
           for _ in $(seq 50); do curl -s -o /dev/null localhost:14002/health/liveliness && break; sleep 0.2; done
           curl -fsS -o /dev/null -H "Authorization: Bearer $(key master-key)" -H 'Content-Type: application/json' \
             localhost:14002/key/update -d "{\"key\": \"$(key user-key-val)\", \"spend\": 1.0}"
+          kill %1
+          # Budgets are checked against an in-memory counter; a new pod reads spend from the DB.
+          kubectl -n platform rollout restart deployment/litellm
+          kubectl -n platform rollout status deployment/litellm --timeout=300s
+          kubectl -n platform port-forward svc/litellm 14002:4000 >/dev/null 2>&1 &
+          for _ in $(seq 50); do curl -s -o /dev/null localhost:14002/health/liveliness && break; sleep 0.2; done
           code="$(curl -s -o /dev/null -w '%{http_code}' -H "Authorization: Bearer $(key user-key-val)" \
             -H 'Content-Type: application/json' localhost:14002/v1/chat/completions \
             -d '{"model": "agent-default", "messages": [{"role": "user", "content": "hi"}]}')"
