@@ -8,6 +8,7 @@ import subprocess
 import time
 from collections.abc import Callable, Iterator
 from dataclasses import dataclass
+from pathlib import Path
 
 import httpx
 import pytest
@@ -17,6 +18,7 @@ POD = "postgres-0"
 ISSUER = "http://localhost:8080/auth/realms/tarnwick"
 TOKEN_URL = f"{ISSUER}/protocol/openid-connect/token"
 DEMO_USERS = ("alice", "morgan", "val")
+ROOT = Path(__file__).resolve().parents[2]
 
 
 def kubectl(*args: str) -> str:
@@ -72,6 +74,12 @@ def password_grant(client_id: str, username: str, password: str) -> httpx.Respon
         },
         timeout=10,
     )
+
+
+@pytest.fixture(scope="session", autouse=True)
+def fresh_gateway_budgets() -> None:
+    """Spend from earlier runs on a kept cluster must not use up the demo users' budgets."""
+    subprocess.run([str(ROOT / "scripts" / "reset-llm-spend.sh")], check=True)
 
 
 @pytest.fixture(scope="session")
