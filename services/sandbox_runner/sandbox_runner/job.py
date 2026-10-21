@@ -25,6 +25,9 @@ UID = 65534  # nobody
 NETWORK_PROBE = ("10.43.0.1", 443)
 NETWORK_WAIT_SECONDS = 8
 NOT_ISOLATED_EXIT = 97
+# Pod logs merge stdout and stderr, so the guard marks its own lines and the runner moves them
+# out of the run's output (which the agent parses) into a separate guard_log field.
+GUARD_PREFIX = "[sandbox-guard] "
 
 
 def guard_script(probe: tuple[str, int] = NETWORK_PROBE, wait: float = NETWORK_WAIT_SECONDS) -> str:
@@ -39,10 +42,10 @@ while True:
     except OSError:
         break
     if not waited:
-        print("waiting for network isolation", file=sys.stderr, flush=True)
+        print("{GUARD_PREFIX}waiting for network isolation", file=sys.stderr, flush=True)
         waited = True
     if time.monotonic() > deadline:
-        print("sandbox network is not isolated; code not run", file=sys.stderr)
+        print("{GUARD_PREFIX}sandbox network is not isolated; code not run", file=sys.stderr)
         sys.exit({NOT_ISOLATED_EXIT})
     time.sleep(0.2)
 code = sys.argv[1]
@@ -117,3 +120,11 @@ def build_job(name: str, code: str, input_json: str, requested_by: str) -> dict:
             },
         },
     }
+
+
+def split_guard_lines(logs: str) -> tuple[str, str]:
+    """Separate the guard's lines from the model code's output: (output, guard_log)."""
+    output, guard = [], []
+    for line in logs.splitlines(keepends=True):
+        (guard if line.startswith(GUARD_PREFIX) else output).append(line)
+    return "".join(output), "".join(line[len(GUARD_PREFIX) :] for line in guard)
