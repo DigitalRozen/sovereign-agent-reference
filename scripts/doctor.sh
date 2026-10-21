@@ -134,6 +134,30 @@ if command -v k3d >/dev/null 2>&1 && k3d cluster list "$CLUSTER" >/dev/null 2>&1
     | grep -q 'Skipping network policy controller start, ipset save failed'; then
     warn "k3s skipped its network policy controller (ipset save failed): sandbox isolation is NOT enforced (see RUN_LOCAL.md)"
   fi
+  # Services must run this checkout's images. With the old fixed ":dev" tag, make up kept
+  # stale pods, e.g. a sandbox-runner without the network guard.
+  want_tag="$("$ROOT/scripts/image-tag.sh")"
+  stale=()
+  for svc in scripted-llm mcp-erp sandbox-runner agent-api; do
+    images="$(kubectl -n platform get pods -l "app=$svc" \
+      -o jsonpath='{.items[*].spec.containers[0].image}' 2>/dev/null)"
+    for img in ${images:-none}; do
+      [[ "$img" == "sovereign-agent/$svc:$want_tag" ]] || stale+=("$svc=${img##*:}")
+    done
+  done
+  if ((${#stale[@]} == 0)); then
+    pass "service pods run this checkout's images (tag $want_tag)"
+  else
+    warn "service pods do not match this checkout (tag $want_tag): ${stale[*]}; run 'make up'"
+  fi
+  # deny-all must exist and select every pod in the sandbox namespace, both directions.
+  policy="$(kubectl -n sandbox get networkpolicy deny-all \
+    -o jsonpath='{.spec.podSelector}|{.spec.policyTypes}' 2>/dev/null || true)"
+  if [[ "$policy" == '{}|["Ingress","Egress"]' ]]; then
+    pass "NetworkPolicy deny-all selects every sandbox pod, ingress and egress"
+  else
+    warn "NetworkPolicy deny-all is missing or changed in namespace sandbox (got '${policy:-nothing}'); run 'make up'"
+  fi
   "$ROOT/scripts/netpol-check.sh"
   case $? in
     0) pass "NetworkPolicy enforced: a probe pod in the sandbox namespace cannot reach the Kubernetes API" ;;

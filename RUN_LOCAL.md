@@ -61,7 +61,7 @@ Set `OPENROUTER_API_KEY` in `.env` and run `make up` again. Only `.env` counts: 
 make down                  # deletes the cluster and all its data, including generated secrets
 ```
 
-Locally built images (`sovereign-agent/*:dev`) stay in Docker; remove them with `docker image rm` if you want the disk back.
+Locally built images (`sovereign-agent/*:<git sha>`) stay in Docker; remove them with `docker image rm` if you want the disk back.
 
 ## Troubleshooting
 
@@ -74,6 +74,7 @@ Locally built images (`sovereign-agent/*:dev`) stay in Docker; remove them with 
 | Image pulls fail or hit rate limits | Check network or proxy access to Docker Hub, quay.io and ghcr.io, then re-run `make up`. |
 | A pod stays in `ErrImageNeverPull` | The images are built locally and imported, never pulled, so the import into the node failed. `k3d image import` can log `failed to import images` and still exit 0; `make up` checks every image in the node and retries three times, then stops with `could not import ...`. Run `make up` again; if it keeps failing, `make down && make up`. |
 | `make up` or `make doctor` says **NetworkPolicy is NOT enforced**, or `make smoke` fails `test_no_network_not_even_cluster_dns_or_the_kube_api` | k3s's policy controller (built into the k3s process, not a pod) is not filtering traffic, so **sandbox isolation is NOT enforced**. Collect: `docker logs k3d-sovereign-agent-server-0 2>&1 \| grep -iE 'network.?policy\|netpol\|ipset\|iptables-restore' \| tail -20`, `docker exec k3d-sovereign-agent-server-0 iptables-save \| grep -c KUBE-NWPLCY`, `docker exec k3d-sovereign-agent-server-0 ipset list -n \| head` and `docker info --format '{{.OperatingSystem}} {{.KernelVersion}}'`. If the log says `Skipping network policy controller start, ipset save failed`, Docker's kernel lacks `ip_set`: use a kernel with `CONFIG_IP_SET` (with Docker Desktop that is Docker's VM kernel, not your distro's), then `make down && make up`. To tell a late policy from a missing one, run `./scripts/netpol-check.sh --trace`: `reachable` only in the first seconds means it lands late, which the sandbox waits out; `reachable` throughout means it is not enforced. A sandbox run that fails with `sandbox network was not isolated; code not run` is this case. |
+| Sandbox tests fail with the sandbox reaching the network, and the output never says `waiting for network isolation` | The cluster runs an old `sandbox-runner`, built before the network guard. Older versions tagged every image `:dev`, so `make up` on an existing cluster left the Deployments "unchanged" and kept the old pods. `make up` now tags images with the git commit (plus a hash of uncommitted changes under `services/`), so changed code always rolls new pods, and it checks that every service pod runs the new tag. `make doctor` reports pods that do not match the checkout. Run `make up` again. |
 | You want a clean slate | `make down && make up`. New passwords are generated; run `make creds` again. |
 
 For anything else, `kubectl get pods -A` and the logs of the failing pod are the starting point; the CI workflow's *Cluster state on failure* step lists the useful commands.
