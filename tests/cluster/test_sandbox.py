@@ -51,7 +51,10 @@ def test_quantity_calculation_runs_and_reads_its_input(runner, user_token):
     data = {"demand_kg": [6800, 4300], "safety_kg": 3000, "available_kg": 1800}
     response = run(runner, user_token("alice"), code, data)
     assert response.status_code == 200, response.text
-    assert json.loads(response.json()["output"]) == {"order_kg": 12300}
+    result = response.json()
+    # Show status, reason and guard_log on failure, not just a JSON decode error.
+    assert result["status"] == "succeeded", result
+    assert json.loads(result["output"]) == {"order_kg": 12300}, result
 
 
 def test_no_network_not_even_cluster_dns_or_the_kube_api(runner, user_token):
