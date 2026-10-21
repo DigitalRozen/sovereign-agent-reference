@@ -160,10 +160,27 @@ else
 fi
 
 echo "Configuration"
-if [[ -f "$ROOT/.env" ]] && grep -Eq '^OPENROUTER_API_KEY=.+' "$ROOT/.env"; then
+# Read .env exactly as up.sh does (sourced, with any shell value removed first).
+env_key="$(
+  unset OPENROUTER_API_KEY
+  if [[ -f "$ROOT/.env" ]]; then
+    set -a
+    # shellcheck disable=SC1091
+    source "$ROOT/.env" >/dev/null 2>&1
+  fi
+  printf '%s' "${OPENROUTER_API_KEY:-}"
+)"
+if [[ -n "$env_key" ]]; then
   pass ".env sets OPENROUTER_API_KEY: the agent will use a real model (requests leave the machine)"
 else
-  pass "no provider key: the agent uses the built-in scripted model, nothing leaves the machine"
+  pass "no provider key in .env: the agent uses the built-in scripted model, nothing leaves the machine"
+fi
+if [[ -n "${OPENROUTER_API_KEY:-}" ]]; then
+  if [[ -n "$env_key" && "$env_key" != "$OPENROUTER_API_KEY" ]]; then
+    warn "OPENROUTER_API_KEY in your shell differs from .env; make up uses the one in .env"
+  elif [[ -z "$env_key" ]]; then
+    warn "OPENROUTER_API_KEY is set in your shell but not in .env; make up ignores it (only .env counts)"
+  fi
 fi
 if [[ -d "$ROOT/.venv" ]]; then
   pass "Python dev environment present"

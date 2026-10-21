@@ -32,11 +32,15 @@ def guard_script(probe: tuple[str, int] = NETWORK_PROBE, wait: float = NETWORK_W
     return f"""
 import socket, sys, time
 deadline = time.monotonic() + {wait}
+waited = False
 while True:
     try:
         socket.create_connection({probe!r}, timeout=0.5).close()
     except OSError:
         break
+    if not waited:
+        print("waiting for network isolation", file=sys.stderr, flush=True)
+        waited = True
     if time.monotonic() > deadline:
         print("sandbox network is not isolated; code not run", file=sys.stderr)
         sys.exit({NOT_ISOLATED_EXIT})

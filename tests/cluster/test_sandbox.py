@@ -1,8 +1,12 @@
 """Model-written code runs, but cannot reach the network, the cluster, or the node."""
 
 import json
+import subprocess
 import textwrap
+import threading
+import time
 from collections.abc import Iterator
+from pathlib import Path
 
 import httpx
 import pytest
@@ -142,3 +146,79 @@ def test_runs_are_audited(runner, user_token, psql):
         "WHERE action = 'sandbox.run' ORDER BY event_id DESC LIMIT 1;",
     )
     assert audit.output == "morgan:succeeded"
+
+
+# --- Late NetworkPolicy -----------------------------------------------------------------
+# On WSL2 with Docker Desktop the policy reached a new pod about two seconds after it started.
+# CI is fast, so the condition is reproduced here: remove deny-all, start a run, and only
+# then put the policy back. The guard in the Job must hold the model's code until then.
+
+POLICY = Path(__file__).parents[2] / "deploy/base/sandbox/network-policy.yaml"
+NETWORK_PROBE_CODE = """
+    import json, socket
+    try:
+        socket.create_connection(("10.43.0.1", 443), timeout=2).close()
+        print(json.dumps({"kube_api": "reachable"}))
+    except OSError as exc:
+        print(json.dumps({"kube_api": type(exc).__name__}))
+"""
+
+
+def sandbox_kubectl(*args: str) -> str:
+    return subprocess.run(  # noqa: S603
+        ["kubectl", *args], check=True, capture_output=True, text=True
+    ).stdout
+
+
+def wait_for_running_run_pod(timeout: float = 60) -> None:
+    deadline = time.monotonic() + timeout
+    while time.monotonic() < deadline:
+        running = sandbox_kubectl(
+            "-n", "sandbox", "get", "pods", "-l", "role=sandbox-run",
+            "--field-selector=status.phase=Running", "-o", "name",
+        )  # fmt: skip
+        if running.strip():
+            return
+        time.sleep(0.2)
+    raise AssertionError("the sandbox run's pod never started")
+
+
+@pytest.fixture
+def deny_all_removed() -> Iterator[None]:
+    """Run with the sandbox's deny-all policy deleted; it is always restored afterwards."""
+    sandbox_kubectl("-n", "sandbox", "delete", "networkpolicy", "deny-all")
+    time.sleep(3)  # let the policy controller drop the rules
+    try:
+        yield
+    finally:
+        sandbox_kubectl("apply", "-f", str(POLICY))
+        time.sleep(3)
+
+
+def test_code_waits_for_a_policy_that_arrives_late(runner, user_token, deny_all_removed):
+    result: dict = {}
+
+    def start_run() -> None:
+        response = run(runner, user_token("alice"), NETWORK_PROBE_CODE)
+        result.update(response.json(), http=response.status_code)
+
+    worker = threading.Thread(target=start_run)
+    worker.start()
+    wait_for_running_run_pod()
+    time.sleep(2)  # the guard is now finding the network open
+    sandbox_kubectl("apply", "-f", str(POLICY))
+    worker.join(timeout=90)
+
+    assert result.get("http") == 200 and result["status"] == "succeeded", result
+    assert "waiting for network isolation" in result["output"], result
+    probe_result = json.loads(result["output"].strip().splitlines()[-1])
+    assert probe_result["kube_api"] != "reachable", result
+
+
+def test_code_never_runs_when_the_policy_never_arrives(runner, user_token, deny_all_removed):
+    response = run(runner, user_token("alice"), NETWORK_PROBE_CODE)
+    assert response.status_code == 200, response.text
+    result = response.json()
+    assert result["status"] == "failed", result
+    assert "not isolated; code not run" in result["reason"], result
+    assert "kube_api" not in result["output"], result

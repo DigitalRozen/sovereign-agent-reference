@@ -73,7 +73,7 @@ make demo              # run the scenario from the terminal
 
 Then open **http://localhost:8080/agent/**: log in as `alice` (buyer) and run the agent, then as `morgan` (manager) to approve, and look at the *Audit log*. `make down` deletes everything. The 3-minute walkthrough is in [docs/demo-script.md](docs/demo-script.md).
 
-Without `OPENROUTER_API_KEY` no request leaves the cluster. The model is `scripted-llm`, a deterministic stand-in that plays the scenario, including falling for the injection. With a key, the agent uses a real model through the same gateway, and the controls are the same.
+Without `OPENROUTER_API_KEY` in `.env` (a key in your shell is ignored) no request leaves the cluster. The model is `scripted-llm`, a deterministic stand-in that plays the scenario, including falling for the injection. With a key, the agent uses a real model through the same gateway, and the controls are the same.
 
 ## What is proven, and where
 
