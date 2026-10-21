@@ -61,6 +61,23 @@ jobs:
           time make reset-demo
           make demo | tee demo.txt
           grep -q 'Drafted purchase order #1 for' demo.txt
+      # The WSL2 failure: make up on an existing cluster kept the old sandbox-runner pod
+      # (fixed ":dev" tag, "unchanged" Deployment), so sandbox runs lacked the network guard.
+      - name: make up after a code change rolls new service pods
+        run: |
+          image() { kubectl -n platform get deploy sandbox-runner -o jsonpath='{.spec.template.spec.containers[0].image}'; }
+          before="$(image)"
+          echo "# changed in CI" >> services/sandbox_runner/sandbox_runner/__init__.py
+          make up
+          after="$(image)"
+          echo "sandbox-runner: $before -> $after"
+          test "$before" != "$after"
+          make doctor | tee doctor.txt
+          grep -q "service pods run this checkout's images" doctor.txt
+          grep -q "deny-all selects every sandbox pod" doctor.txt
+          grep -q "NetworkPolicy enforced" doctor.txt
+          uv run pytest -q -m cluster tests/cluster/test_sandbox.py
+          git checkout -- services/sandbox_runner/sandbox_runner/__init__.py
       - name: Cluster state on failure
         if: failure()
         run: |
