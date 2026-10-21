@@ -210,8 +210,9 @@ def test_code_waits_for_a_policy_that_arrives_late(runner, user_token, deny_all_
     worker.join(timeout=90)
 
     assert result.get("http") == 200 and result["status"] == "succeeded", result
-    assert "waiting for network isolation" in result["output"], result
-    probe_result = json.loads(result["output"].strip().splitlines()[-1])
+    assert "waiting for network isolation" in result["guard_log"], result
+    # The guard's message must not leak into the output the agent parses.
+    probe_result = json.loads(result["output"])
     assert probe_result["kube_api"] != "reachable", result
 
 
@@ -222,3 +223,4 @@ def test_code_never_runs_when_the_policy_never_arrives(runner, user_token, deny_
     assert result["status"] == "failed", result
     assert "not isolated; code not run" in result["reason"], result
     assert "kube_api" not in result["output"], result
+    assert "not isolated" in result["guard_log"], result

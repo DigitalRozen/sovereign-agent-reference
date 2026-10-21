@@ -20,6 +20,7 @@ from .job import (
     CodeRejected,
     build_job,
     job_name,
+    split_guard_lines,
 )
 
 ISSUER = os.environ.get("OIDC_ISSUER", "http://localhost:8080/auth/realms/tarnwick")
@@ -47,8 +48,9 @@ class RunRequest(BaseModel):
 class RunResult:
     status: str  # succeeded | failed | timeout
     reason: str
-    output: str
+    output: str  # the model code's output only
     job: str
+    guard_log: str = ""  # the network guard's messages, e.g. "waiting for network isolation"
 
 
 def caller_from(authorization: str | None) -> str:
@@ -146,7 +148,10 @@ def run_job(code: str, input_json: str, requested_by: str) -> RunResult:
             output = response.data.decode("utf-8", errors="replace")
         except client.ApiException:
             output = ""
-    return RunResult(status=outcome[0], reason=outcome[1], output=output, job=name)
+    output, guard_log = split_guard_lines(output)
+    return RunResult(
+        status=outcome[0], reason=outcome[1], output=output, job=name, guard_log=guard_log
+    )
 
 
 @app.get("/healthz")

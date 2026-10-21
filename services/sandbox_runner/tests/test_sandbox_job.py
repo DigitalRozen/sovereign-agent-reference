@@ -5,6 +5,7 @@ import sys
 import pytest
 from sandbox_runner.job import (
     DEADLINE_SECONDS,
+    GUARD_PREFIX,
     MAX_CODE_BYTES,
     NAMESPACE,
     NOT_ISOLATED_EXIT,
@@ -12,6 +13,7 @@ from sandbox_runner.job import (
     build_job,
     guard_script,
     job_name,
+    split_guard_lines,
 )
 
 
@@ -97,8 +99,17 @@ def test_guard_refuses_to_run_code_while_the_network_is_reachable():
         result = run_guarded(listener.getsockname(), "print('ran')")
     assert result.returncode == NOT_ISOLATED_EXIT
     assert "ran" not in result.stdout
-    assert "waiting for network isolation" in result.stderr
-    assert "not isolated" in result.stderr
+    assert f"{GUARD_PREFIX}waiting for network isolation" in result.stderr
+    assert f"{GUARD_PREFIX}sandbox network is not isolated" in result.stderr
+    assert result.stdout == ""
+
+
+def test_guard_messages_are_split_from_the_code_output():
+    logs = f'{GUARD_PREFIX}waiting for network isolation\n{{"order_kg": 12300}}\n'
+    output, guard_log = split_guard_lines(logs)
+    assert output == '{"order_kg": 12300}\n'
+    assert guard_log == "waiting for network isolation\n"
+    assert split_guard_lines("plain output\n") == ("plain output\n", "")
 
 
 def test_oversized_or_empty_code_is_rejected():
